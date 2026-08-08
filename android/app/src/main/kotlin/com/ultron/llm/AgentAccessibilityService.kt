@@ -65,7 +65,9 @@ class AgentAccessibilityService : AccessibilityService() {
                     )
                     listener(map)
                 }
-                node?.recycle()
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    node?.recycle()
+                }
             }
             AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
                 val map = mapOf("type" to "scroll")
@@ -92,18 +94,24 @@ class AgentAccessibilityService : AccessibilityService() {
             if (root.packageName?.toString() != ownPackageName) {
                 traverseNode(root, nodes, 0)
             }
-            root.recycle()
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                root.recycle()
+            }
             return nodes
         }
         
         for (window in allWindows) {
             val root = window.root ?: continue
             if (root.packageName?.toString() == ownPackageName) {
-                root.recycle()
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    root.recycle()
+                }
                 continue
             }
             traverseNode(root, nodes, 0)
-            root.recycle()
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                root.recycle()
+            }
         }
         return nodes
     }
@@ -127,7 +135,9 @@ class AgentAccessibilityService : AccessibilityService() {
             for (i in 0 until node.childCount) {
                 val child = node.getChild(i) ?: continue
                 traverseNode(child, nodes, depth + 1)
-                child.recycle()
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    child.recycle()
+                }
             }
             return
         }
@@ -163,7 +173,9 @@ class AgentAccessibilityService : AccessibilityService() {
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
             traverseNode(child, nodes, depth + 1)
-            child.recycle()
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                child.recycle()
+            }
         }
     }
 
@@ -207,7 +219,9 @@ class AgentAccessibilityService : AccessibilityService() {
         for (window in windows) {
             val root = window.root ?: continue
             if (root.packageName?.toString() == ownPackageName) {
-                root.recycle()
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    root.recycle()
+                }
                 continue
             }
             // Prefer an actual suggestion/button over an editable search field
@@ -217,7 +231,9 @@ class AgentAccessibilityService : AccessibilityService() {
                 || findAndClickNode(root, targetText, false, true)
                 || findAndClickNode(root, targetText, true, false)
                 || findAndClickNode(root, targetText, false, false)
-            root.recycle()
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                root.recycle()
+            }
             if (result) return true
         }
         return false
@@ -245,10 +261,14 @@ class AgentAccessibilityService : AccessibilityService() {
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
             if (findAndClickNode(child, targetText, exactOnly, skipEditable)) {
-                child.recycle()
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    child.recycle()
+                }
                 return true
             }
-            child.recycle()
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                child.recycle()
+            }
         }
         return false
     }
@@ -284,7 +304,9 @@ class AgentAccessibilityService : AccessibilityService() {
         for (window in windows) {
             val root = window.root ?: continue
             if (root.packageName?.toString() == ownPackageName) {
-                root.recycle()
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    root.recycle()
+                }
                 continue
             }
 
@@ -298,10 +320,14 @@ class AgentAccessibilityService : AccessibilityService() {
                 val args = Bundle()
                 args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
                 val success = editNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
-                root.recycle()
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    root.recycle()
+                }
                 return success
             }
-            root.recycle()
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                root.recycle()
+            }
         }
         return false
     }
@@ -312,15 +338,21 @@ class AgentAccessibilityService : AccessibilityService() {
             for (window in windows) {
                 val root = window.root ?: continue
                 if (root.packageName?.toString() == ownPackageName) {
-                    root.recycle()
+                    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        root.recycle()
+                    }
                     continue
                 }
                 val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
                 val submitted = focused?.performAction(
                     AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id
                 ) == true
-                focused?.recycle()
-                root.recycle()
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    focused?.recycle()
+                }
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    root.recycle()
+                }
                 if (submitted) return true
             }
         }
@@ -329,8 +361,12 @@ class AgentAccessibilityService : AccessibilityService() {
             val root = window.root ?: continue
             val actionNode = findKeyboardActionNode(root)
             val submitted = actionNode != null && clickNodeOrParent(actionNode)
-            actionNode?.recycle()
-            root.recycle()
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                actionNode?.recycle()
+            }
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                root.recycle()
+            }
             if (submitted) return true
         }
 
@@ -360,7 +396,9 @@ class AgentAccessibilityService : AccessibilityService() {
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
             val found = findKeyboardActionNode(child)
-            child.recycle()
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                child.recycle()
+            }
             if (found != null) return found
         }
         return null
@@ -389,7 +427,9 @@ class AgentAccessibilityService : AccessibilityService() {
             val child = node.getChild(i) ?: continue
             val found = findEditableNode(child, hint)
             if (found != null) return found
-            child.recycle()
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                child.recycle()
+            }
         }
         return null
     }
@@ -399,7 +439,9 @@ class AgentAccessibilityService : AccessibilityService() {
         for (window in windows) {
             val root = window.root ?: continue
             if (root.packageName?.toString() == ownPackageName) {
-                root.recycle()
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    root.recycle()
+                }
                 continue
             }
             val scrollNode = findScrollableNode(root, targetText)
@@ -410,10 +452,14 @@ class AgentAccessibilityService : AccessibilityService() {
                     else -> AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
                 }
                 val success = scrollNode.performAction(action)
-                root.recycle()
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    root.recycle()
+                }
                 return success
             }
-            root.recycle()
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                root.recycle()
+            }
         }
         return false
     }
@@ -436,7 +482,9 @@ class AgentAccessibilityService : AccessibilityService() {
             val child = node.getChild(i) ?: continue
             val found = findScrollableNode(child, targetText)
             if (found != null) return found
-            child.recycle()
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                child.recycle()
+            }
         }
         return null
     }
@@ -490,7 +538,9 @@ class AgentAccessibilityService : AccessibilityService() {
         for (window in windows) {
             val root = window.root ?: continue
             val pkg = root.packageName?.toString()
-            root.recycle()
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                root.recycle()
+            }
 
             if (pkg == null || window.type != AccessibilityWindowInfo.TYPE_APPLICATION) {
                 continue

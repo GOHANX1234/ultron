@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'dart:developer' as developer;
 import '../models/saved_skill.dart';
 
 class SkillMemoryService {
@@ -27,7 +28,7 @@ class SkillMemoryService {
           .toList();
       _isLoaded = true;
     } catch (e) {
-      print('Failed to load skills: $e');
+      developer.log('Failed to load skills: $e');
     }
   }
 
@@ -37,7 +38,7 @@ class SkillMemoryService {
       final lines = _skills.map((s) => jsonEncode(s.toJson())).join('\n');
       await file.writeAsString(lines + (lines.isNotEmpty ? '\n' : ''));
     } catch (e) {
-      print('Failed to save skills: $e');
+      developer.log('Failed to save skills: $e');
     }
   }
 

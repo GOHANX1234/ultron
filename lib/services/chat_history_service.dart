@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'dart:developer' as developer;
 
 class ChatSession {
   final String id;
@@ -51,7 +52,7 @@ class ChatHistoryService {
       await temporary.writeAsString(jsonEncode(message), flush: true);
       await temporary.rename(event.path);
     } catch (e) {
-      print('Error appending overlay chat message: $e');
+      developer.log('Error appending overlay chat message: $e');
     }
   }
 
@@ -79,7 +80,7 @@ class ChatHistoryService {
       }
       return messages;
     } catch (e) {
-      print('Error consuming overlay chat messages: $e');
+      developer.log('Error consuming overlay chat messages: $e');
       return [];
     }
   }
@@ -100,7 +101,7 @@ class ChatHistoryService {
       final jsonList = sessions.map((s) => s.toJson()).toList();
       await file.writeAsString(jsonEncode(jsonList));
     } catch (e) {
-      print('Error saving chat session: $e');
+      developer.log('Error saving chat session: $e');
     }
   }
 
@@ -118,7 +119,7 @@ class ChatHistoryService {
           .map((item) => ChatSession.fromJson(item as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print('Error loading chat sessions: $e');
+      developer.log('Error loading chat sessions: $e');
       return [];
     }
   }
@@ -133,7 +134,7 @@ class ChatHistoryService {
       final jsonList = sessions.map((s) => s.toJson()).toList();
       await file.writeAsString(jsonEncode(jsonList));
     } catch (e) {
-      print('Error deleting chat session: $e');
+      developer.log('Error deleting chat session: $e');
     }
   }
 
@@ -145,7 +146,7 @@ class ChatHistoryService {
         await file.delete();
       }
     } catch (e) {
-      print('Error clearing chat history: $e');
+      developer.log('Error clearing chat history: $e');
     }
   }
 }

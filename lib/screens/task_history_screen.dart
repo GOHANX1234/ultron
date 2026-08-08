@@ -84,6 +84,8 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Task History (${_history.length})'),
@@ -109,10 +111,10 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceAround,
                               children: [
-                                _buildStatColumn('Total', _analytics!['totalTasks'].toString(), isDark: Theme.of(context).brightness == Brightness.dark),
-                                _buildStatColumn('Success', _analytics!['successCount'].toString(), color: Colors.green, isDark: Theme.of(context).brightness == Brightness.dark),
-                                _buildStatColumn('Failed', _analytics!['failedCount'].toString(), color: Colors.red, isDark: Theme.of(context).brightness == Brightness.dark),
-                                _buildStatColumn('Rate', '${(_analytics!['successRate'] * 100).toStringAsFixed(1)}%', isDark: Theme.of(context).brightness == Brightness.dark),
+                                _buildStatColumn('Total', _analytics!['totalTasks'].toString(), isDark: isDark),
+                                _buildStatColumn('Success', _analytics!['successCount'].toString(), color: Colors.green, isDark: isDark),
+                                _buildStatColumn('Failed', _analytics!['failedCount'].toString(), color: Colors.red, isDark: isDark),
+                                _buildStatColumn('Rate', '${(_analytics!['successRate'] * 100).toStringAsFixed(1)}%', isDark: isDark),
                               ],
                             ),
                           ),
@@ -136,7 +138,7 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
                               leading: Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: _getStatusColor(status).withOpacity(0.12),
+                                  color: _getStatusColor(status).withValues(alpha: 0.12),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
@@ -180,9 +182,9 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                             decoration: BoxDecoration(
-                                              color: _getStatusColor(status).withOpacity(0.12),
+                                              color: _getStatusColor(status).withValues(alpha: 0.12),
                                               borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(color: _getStatusColor(status).withOpacity(0.3)),
+                                              border: Border.all(color: _getStatusColor(status).withValues(alpha: 0.3)),
                                             ),
                                             child: Text(
                                               status.toUpperCase(),
@@ -219,7 +221,7 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
                                           style: TextStyle(
                                             fontFamily: 'monospace',
                                             fontSize: 12,
-                                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.85),
+                                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85),
                                           ),
                                         ),
                                       )),
@@ -244,7 +246,7 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
         color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.06),
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
         ),
       ),
       child: Column(

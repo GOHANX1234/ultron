@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:developer' as developer;
 import 'action_handler.dart';
 import 'ai_service.dart';
 
@@ -14,6 +15,7 @@ class TelegramService {
   int _lastUpdateId = 0;
   bool _isPolling = false;
   Timer? _pollingTimer;
+  int _retryDelaySeconds = 1;
 
   TelegramService(this._actionHandler, this._aiService);
 
@@ -73,6 +75,7 @@ class TelegramService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['ok'] == true) {
+          _retryDelaySeconds = 1;
           final results = data['result'] as List;
           for (final update in results) {
             _lastUpdateId = update['update_id'];
@@ -87,12 +90,13 @@ class TelegramService {
         }
       }
     } catch (e) {
-      print('Telegram polling error: $e');
+      developer.log('Telegram polling error: $e');
+      _retryDelaySeconds = (_retryDelaySeconds * 2).clamp(1, 60);
     }
 
     // Continue polling
     if (_isPolling) {
-      _pollingTimer = Timer(const Duration(seconds: 1), _pollUpdates);
+      _pollingTimer = Timer(Duration(seconds: _retryDelaySeconds), _pollUpdates);
     }
   }
 
@@ -140,7 +144,7 @@ class TelegramService {
         }),
       );
     } catch (e) {
-      print('Failed to send telegram message: $e');
+      developer.log('Failed to send telegram message: $e');
     }
   }
 

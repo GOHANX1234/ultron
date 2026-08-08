@@ -22,7 +22,7 @@ void overlayMain() {
         primaryColor: const Color(0xFF4F46E5),
         useMaterial3: true,
         colorScheme: const ColorScheme.light(
-          background: Colors.transparent,
+          surface: Colors.transparent,
           primary: Color(0xFF4F46E5),
           surface: Colors.white,
           onSurface: Color(0xFF1E293B),
@@ -157,7 +157,7 @@ class Ultron3App extends StatelessWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(
-                  color: const Color(0xFF243049).withOpacity(0.4),
+                  color: const Color(0xFF243049).withValues(alpha: 0.4),
                   width: 1.2,
                 ),
               ),

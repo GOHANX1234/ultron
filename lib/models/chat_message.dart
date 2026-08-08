@@ -25,7 +25,7 @@ class ChatMessage {
         content: json['content'] as String,
         timestamp: DateTime.parse(json['timestamp'] as String),
         actionResult: json['actionResult'] != null
-            ? AgentActionResult.fromJson(json['actionResult'] as Map<String, dynamic>)
+            ? AgentActionResult.fromJson((json['actionResult'] as Map).cast<String, dynamic>())
             : null,
       );
 }

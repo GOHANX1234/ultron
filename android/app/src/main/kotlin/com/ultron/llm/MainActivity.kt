@@ -18,7 +18,6 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.ultron.llm/accessibility"
     private val EVENT_CHANNEL = "com.ultron.llm/accessibility_events"
     private var eventSink: EventChannel.EventSink? = null
-    private var overlayView: View? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

@@ -50,7 +50,7 @@ class SavedSkill {
       successCount: json['success_count'] as int? ?? 0,
       failCount: json['fail_count'] as int? ?? 0,
       lastUsed: DateTime.parse(json['last_used'] as String),
-      steps: (json['steps'] as List).map((s) => ActionStep.fromJson(s as Map<String, dynamic>)).toList(),
+      steps: ((json['steps'] as List?) ?? []).map((s) => ActionStep.fromJson((s as Map).cast<String, dynamic>())).toList(),
     );
   }
 

@@ -12,10 +12,16 @@ class AgentAction {
   factory AgentAction.fromJson(Map<String, dynamic> json) {
     return AgentAction(
       action: json['action'] as String? ?? 'general_query',
-      params: json['params'] as Map<String, dynamic>? ?? {},
+      params: (json['params'] as Map?)?.cast<String, dynamic>() ?? {},
       response: json['response'] as String? ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'action': action,
+    'params': params,
+    'response': response,
+  };
 
   static const List<String> availableActions = [
     'open_app',

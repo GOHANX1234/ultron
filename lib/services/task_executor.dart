@@ -9,6 +9,8 @@ import 'task_history_logger.dart';
 import 'shizuku_service.dart';
 import 'skill_memory_service.dart';
 import 'recovery_engine.dart';
+import 'prompt_builder.dart';
+import 'action_parser.dart';
 import '../models/saved_skill.dart';
 
 /// Executes multi-step UI automation tasks using LLM-guided screen reading.
@@ -573,7 +575,7 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
           return 'I could not complete the task. Please try again.';
         }
 
-        final recovery = await _recoveryEngine.diagnose(action, screenContent);
+        final recovery = _recoveryEngine.diagnose(action, screenContent);
         _report('Recovering: ${recovery.description}');
 
         if (recovery.action == 'wait') {

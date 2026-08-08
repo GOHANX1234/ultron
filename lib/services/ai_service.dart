@@ -207,6 +207,15 @@ Answer questions, explain concepts, brainstorm, write emails/messages, and chat 
     }
   }
 
+  String _buildUrl(String path) {
+    String requestUrl = _baseUrl;
+    if (requestUrl.endsWith(path)) return requestUrl;
+    if (requestUrl.endsWith('/')) {
+      return '$requestUrl${path.startsWith('/') ? path.substring(1) : path}';
+    }
+    return '$requestUrl${path.startsWith('/') ? path : '/$path'}';
+  }
+
   /// Send a message to the AI and get a response.
   Future<String> sendMessage(String message, {bool isAgentMode = true}) async {
     if (_apiKey == null || _apiKey!.isEmpty) {
@@ -229,16 +238,7 @@ Answer questions, explain concepts, brainstorm, write emails/messages, and chat 
         ..._conversationHistory,
       ];
 
-      String requestUrl = _baseUrl;
-      if (requestUrl.endsWith('/chat/completions')) {
-        requestUrl = requestUrl; // User already included it
-      } else {
-        if (requestUrl.endsWith('/')) {
-          requestUrl = '${requestUrl}chat/completions';
-        } else {
-          requestUrl = '$requestUrl/chat/completions';
-        }
-      }
+      final requestUrl = _buildUrl('/chat/completions');
 
       final requestBody = jsonEncode({
         'model': _model,
@@ -341,16 +341,7 @@ Answer questions, explain concepts, brainstorm, write emails/messages, and chat 
         ..._conversationHistory,
       ];
 
-      String requestUrl = _baseUrl;
-      if (requestUrl.endsWith('/chat/completions')) {
-        requestUrl = requestUrl;
-      } else {
-        if (requestUrl.endsWith('/')) {
-          requestUrl = '${requestUrl}chat/completions';
-        } else {
-          requestUrl = '$requestUrl/chat/completions';
-        }
-      }
+      final requestUrl = _buildUrl('/chat/completions');
 
       final client = http.Client();
       final request = http.Request('POST', Uri.parse(requestUrl));
@@ -485,14 +476,7 @@ Answer questions, explain concepts, brainstorm, write emails/messages, and chat 
           {'role': 'user', 'content': prompt},
         ];
 
-        String requestUrl = _baseUrl;
-        if (!requestUrl.endsWith('/chat/completions')) {
-          if (requestUrl.endsWith('/')) {
-            requestUrl = '${requestUrl}chat/completions';
-          } else {
-            requestUrl = '$requestUrl/chat/completions';
-          }
-        }
+        final requestUrl = _buildUrl('/chat/completions');
 
         final response = await http
             .post(
@@ -648,7 +632,7 @@ Answer questions, explain concepts, brainstorm, write emails/messages, and chat 
       }
       return [];
     } catch (e) {
-      print('Error fetching models: $e');
+      developer.log('Error fetching models: $e');
       return [];
     }
   }

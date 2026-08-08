@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'dart:developer' as developer;
 
 class TaskHistoryLogger {
   static Future<File> get _localFile async {
@@ -24,7 +25,7 @@ class TaskHistoryLogger {
       
       await file.writeAsString('${jsonEncode(data)}\n', mode: FileMode.append);
     } catch (e) {
-      print('Failed to write task history: $e');
+      developer.log('Failed to write task history: $e');
     }
   }
 
@@ -42,7 +43,7 @@ class TaskHistoryLogger {
           .reversed
           .toList(); // newest first
     } catch (e) {
-      print('Failed to read task history: $e');
+      developer.log('Failed to read task history: $e');
       return [];
     }
   }
@@ -55,7 +56,7 @@ class TaskHistoryLogger {
         await file.delete();
       }
     } catch (e) {
-      print('Failed to clear task history: $e');
+      developer.log('Failed to clear task history: $e');
     }
   }
 

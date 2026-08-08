@@ -12,7 +12,7 @@ class RecoveryAction {
 
 class RecoveryEngine {
   /// Diagnoses the failure and suggests a recovery action based on the last action and current screen dump.
-  Future<RecoveryAction> diagnose(String lastFailedAction, String screenContent) async {
+  RecoveryAction diagnose(String lastFailedAction, String screenContent) {
     final lowerScreen = screenContent.toLowerCase();
 
     // 1. Loading/spinner detected -> Wait

@@ -364,7 +364,7 @@ class _OverlayAppState extends State<OverlayApp> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.25),
+                  color: Colors.black.withValues(alpha: 0.25),
                   blurRadius: 8,
                   spreadRadius: 1,
                   offset: const Offset(0, 2),
@@ -396,7 +396,7 @@ class _OverlayAppState extends State<OverlayApp> {
           border: Border.all(color: const Color(0xFFEAEAEA), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.15),
+              color: Colors.black.withValues(alpha: 0.15),
               blurRadius: 12,
               spreadRadius: 2,
               offset: const Offset(0, 4),
