@@ -967,8 +967,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const SizedBox(height: 20),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildBackgroundGlows(bool isDark) {
     return Positioned.fill(
