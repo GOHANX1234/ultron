@@ -23,35 +23,69 @@ class VoiceService {
     await _tts.setLanguage('en-US');
     await _tts.setSpeechRate(0.48);
     await _tts.setVolume(1.0);
-    await _tts.setPitch(0.75); // Deeper pitch for male voice
+    await _tts.setPitch(0.70); // Deep male voice pitch
 
+    await _selectMaleVoice();
+  }
+
+  Future<void> _selectMaleVoice() async {
     try {
       final voices = await _tts.getVoices;
       if (voices is List && voices.isNotEmpty) {
+        Map? selectedVoice;
         for (var voice in voices) {
           if (voice is Map) {
             final name = (voice['name'] ?? '').toString().toLowerCase();
             final locale = (voice['locale'] ?? '').toString().toLowerCase();
-            if (locale.contains('en')) {
-              if (name.contains('male') ||
-                  name.contains('guy') ||
-                  name.contains('david') ||
-                  name.contains('james') ||
-                  name.contains('daniel') ||
-                  name.contains('george') ||
-                  name.contains('en-us-x-sfg') ||
-                  name.contains('en-us-x-iom') ||
-                  name.contains('en-us-x-iol')) {
-                await _tts.setVoice({"name": voice["name"], "locale": voice["locale"]});
-                break;
-              }
+            final gender = (voice['gender'] ?? '').toString().toLowerCase();
+
+            if (locale.isNotEmpty && !locale.startsWith('en')) continue;
+
+            // Skip explicit female voices
+            if (name.contains('female') ||
+                name.contains('woman') ||
+                name.contains('girl') ||
+                name.contains('zira') ||
+                name.contains('hazel') ||
+                name.contains('samantha') ||
+                name.contains('victoria') ||
+                gender == 'female') {
+              continue;
+            }
+
+            // High priority male voices (Android Google TTS male models & standard voices)
+            if (name.contains('male') ||
+                name.contains('guy') ||
+                name.contains('man') ||
+                name.contains('david') ||
+                name.contains('james') ||
+                name.contains('daniel') ||
+                name.contains('george') ||
+                name.contains('alex') ||
+                name.contains('fred') ||
+                name.contains('en-us-x-sfg') ||
+                name.contains('en-us-x-iom') ||
+                name.contains('en-us-x-iob') ||
+                name.contains('en-us-x-tpf') ||
+                name.contains('en-us-x-tpc') ||
+                name.contains('en-us-x-iol') ||
+                name.contains('en-us-x-sfd') ||
+                name.contains('en-us-x-gqd') ||
+                gender == 'male') {
+              selectedVoice = voice;
+              break;
             }
           }
         }
+
+        if (selectedVoice != null) {
+          await _tts.setVoice({
+            "name": selectedVoice["name"],
+            "locale": selectedVoice["locale"]
+          });
+        }
       }
-    } catch (_) {
-      // Fallback to pitch 0.75
-    }
+    } catch (_) {}
   }
 
   /// Start listening for speech. Returns transcribed text via callback.
@@ -88,6 +122,10 @@ class VoiceService {
   /// Speak text aloud
   Future<void> speak(String text) async {
     if (text.isEmpty) return;
+    try {
+      await _selectMaleVoice();
+      await _tts.setPitch(0.70);
+    } catch (_) {}
     await _tts.speak(text);
   }
 
