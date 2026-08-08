@@ -716,29 +716,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     return Drawer(
       backgroundColor: drawerBg,
-      child: Column(
-        children: [
-          // Drawer Header
-          Container(
-            padding: const EdgeInsets.only(
-              top: 60,
-              bottom: 20,
-              left: 24,
-              right: 24,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Drawer Header
+            Container(
+              padding: const EdgeInsets.only(
+                top: 16,
+                bottom: 16,
+                left: 20,
+                right: 12,
+              ),
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.smart_toy_rounded,
+                    color: Theme.of(context).primaryColor,
+                    size: 26,
+                  ),
+                  const SizedBox(width: 12),
+                  Text('Ultron-3', style: headerStyle),
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                      size: 20,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
             ),
-            alignment: Alignment.centerLeft,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.smart_toy_rounded,
-                  color: Theme.of(context).primaryColor,
-                  size: 26,
-                ),
-                const SizedBox(width: 12),
-                Text('Ultron-3', style: headerStyle),
-              ],
-            ),
-          ),
 
           // New Chat Button
           Padding(
@@ -1255,61 +1265,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildInputBar(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      decoration: const BoxDecoration(color: Colors.transparent),
-      child: Row(
-        children: [
-          // Glowing Voice Mic button
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _isListening
-                  ? Colors.redAccent
-                  : Theme.of(context).cardTheme.color,
-              border: Border.all(
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        decoration: const BoxDecoration(color: Colors.transparent),
+        child: Row(
+          children: [
+            // Glowing Voice Mic button
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
                 color: _isListening
                     ? Colors.redAccent
-                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-                if (_isListening)
-                  BoxShadow(
-                    color: Colors.redAccent.withOpacity(0.4),
-                    blurRadius: 12,
-                    spreadRadius: 2,
-                  ),
-              ],
-            ),
-            child: IconButton(
-              icon: Icon(
-                _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                color: _isListening
-                    ? Colors.white
-                    : Theme.of(context).colorScheme.primary,
-              ),
-              onPressed: _isLoading ? null : _toggleVoice,
-            ),
-          ),
-          const SizedBox(width: 10),
-
-          // Custom Text input container
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardTheme.color,
-                borderRadius: BorderRadius.circular(24),
+                    : Theme.of(context).cardTheme.color,
                 border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withOpacity(0.08),
+                  color: _isListening
+                      ? Colors.redAccent
+                      : Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
                   width: 1.2,
                 ),
                 boxShadow: [
@@ -1318,58 +1292,97 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
+                  if (_isListening)
+                    BoxShadow(
+                      color: Colors.redAccent.withOpacity(0.4),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
                 ],
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _textController,
-                      style: const TextStyle(fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: _isListening
-                            ? 'Listening...'
-                            : 'Type a command...',
-                        hintStyle: TextStyle(
-                          fontSize: 13,
-                          color: isDark ? Colors.grey[600] : Colors.grey[400],
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        border: InputBorder.none,
-                      ),
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: _isLoading
-                          ? null
-                          : (text) => _sendMessage(text),
-                    ),
-                  ),
-
-                  // Solid Send button
-                  Container(
-                    margin: const EdgeInsets.only(right: 6),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.send_rounded,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                      onPressed: _isLoading
-                          ? null
-                          : () => _sendMessage(_textController.text),
-                    ),
-                  ),
-                ],
+              child: IconButton(
+                icon: Icon(
+                  _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                  color: _isListening
+                      ? Colors.white
+                      : Theme.of(context).colorScheme.primary,
+                ),
+                onPressed: _isLoading ? null : _toggleVoice,
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 10),
+
+            // Custom Text input container
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardTheme.color,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.08),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _textController,
+                        style: const TextStyle(fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: _isListening
+                              ? 'Listening...'
+                              : 'Type a command...',
+                          hintStyle: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? Colors.grey[600] : Colors.grey[400],
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          border: InputBorder.none,
+                        ),
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: _isLoading
+                            ? null
+                            : (text) => _sendMessage(text),
+                      ),
+                    ),
+
+                    // Solid Send button
+                    Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.send_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        onPressed: _isLoading
+                            ? null
+                            : () => _sendMessage(_textController.text),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
