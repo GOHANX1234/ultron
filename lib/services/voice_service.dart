@@ -19,11 +19,39 @@ class VoiceService {
       },
     );
 
-    // Configure TTS
+    // Configure TTS with deep male voice
     await _tts.setLanguage('en-US');
-    await _tts.setSpeechRate(0.5);
+    await _tts.setSpeechRate(0.48);
     await _tts.setVolume(1.0);
-    await _tts.setPitch(1.0);
+    await _tts.setPitch(0.75); // Deeper pitch for male voice
+
+    try {
+      final voices = await _tts.getVoices;
+      if (voices is List && voices.isNotEmpty) {
+        for (var voice in voices) {
+          if (voice is Map) {
+            final name = (voice['name'] ?? '').toString().toLowerCase();
+            final locale = (voice['locale'] ?? '').toString().toLowerCase();
+            if (locale.contains('en')) {
+              if (name.contains('male') ||
+                  name.contains('guy') ||
+                  name.contains('david') ||
+                  name.contains('james') ||
+                  name.contains('daniel') ||
+                  name.contains('george') ||
+                  name.contains('en-us-x-sfg') ||
+                  name.contains('en-us-x-iom') ||
+                  name.contains('en-us-x-iol')) {
+                await _tts.setVoice({"name": voice["name"], "locale": voice["locale"]});
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Fallback to pitch 0.75
+    }
   }
 
   /// Start listening for speech. Returns transcribed text via callback.
