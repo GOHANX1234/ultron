@@ -941,7 +941,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ),
             ),
             child: const Text(
-              'âœ¦ PRIVATE LOCAL AI ASSISTANT',
+              '✦ PRIVATE LOCAL AI ASSISTANT',
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w700,
@@ -1775,7 +1775,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                   color: isSelected
                       ? (isDark ? Colors.white : const Color(0xFF4F46E5))
-                      : (isDark ? Colors.white60 : const Color(0xFF64748B)),
+                      : (isDark ? Colors.white54 : const Color(0xFF64748B)),
                 ),
               ),
             ],
@@ -1829,7 +1829,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               prefixIcon: Icon(
                 icon,
                 size: 18,
-                color: isDark ? Colors.white50 : const Color(0xFF64748B),
+                color: isDark ? Colors.white54 : const Color(0xFF64748B),
               ),
               hintText: hint,
               hintStyle: TextStyle(
