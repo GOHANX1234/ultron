@@ -905,41 +905,79 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Widget _buildWelcomePage(bool isDark) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
       child: Column(
         children: [
-          const SizedBox(height: 10),
-          // Liquid Orb Visual
+          const SizedBox(height: 18),
+
+          // --- Hero Icon Orb with animated orbiting ring ---
           Center(
             child: SizedBox(
-              width: 150,
-              height: 150,
+              width: 170,
+              height: 170,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
+                  // Outer pulsing glow
+                  AnimatedBuilder(
+                    animation: _liquidAnimation,
+                    builder: (context, child) {
+                      final pulse = 0.85 + _liquidAnimation.value * 0.15;
+                      return Transform.scale(
+                        scale: pulse,
+                        child: Container(
+                          width: 170,
+                          height: 170,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                const Color(0xFF6366F1).withOpacity(isDark ? 0.18 : 0.12),
+                                const Color(0xFF0EA5E9).withOpacity(isDark ? 0.06 : 0.04),
+                                Colors.transparent,
+                              ],
+                              stops: const [0.0, 0.6, 1.0],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  // Orbiting ring
                   AnimatedBuilder(
                     animation: _liquidAnimation,
                     builder: (context, child) {
                       return Transform.rotate(
                         angle: _liquidAnimation.value * math.pi * 2,
                         child: Container(
-                          width: 145,
-                          height: 145,
+                          width: 140,
+                          height: 140,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: const Color(0xFF6366F1).withOpacity(0.25),
+                              color: isDark
+                                  ? const Color(0xFF818CF8).withOpacity(0.3)
+                                  : const Color(0xFF6366F1).withOpacity(0.18),
                               width: 1.5,
                             ),
                           ),
                           child: Align(
                             alignment: Alignment.topCenter,
                             child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: Color(0xFF38BDF8),
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF38BDF8), Color(0xFF818CF8)],
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF38BDF8).withOpacity(0.6),
+                                    blurRadius: 8,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -947,130 +985,151 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       );
                     },
                   ),
-                  LiquidGlassContainer(
-                    borderRadius: 100,
-                    padding: const EdgeInsets.all(24),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                  // Core icon
+                  Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6366F1).withOpacity(isDark ? 0.45 : 0.30),
+                          blurRadius: 28,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 8),
                         ),
-                      ),
-                      child: const Icon(
-                        Icons.psychology_rounded,
-                        size: 38,
-                        color: Colors.white,
-                      ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.psychology_rounded,
+                      size: 42,
+                      color: Colors.white,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Title Badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: isDark
-                  ? const Color(0xFF6366F1).withOpacity(0.12)
-                  : const Color(0xFF4F46E5).withOpacity(0.08),
-              border: Border.all(
-                color: const Color(0xFF6366F1).withOpacity(0.25),
-              ),
-            ),
-            child: const Text(
-              'âœ¦ PRIVATE LOCAL AI ASSISTANT',
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.0,
-                color: Color(0xFF6366F1),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          Text(
-            'Personal Phone Automation',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              letterSpacing: -0.5,
-              color: isDark ? Colors.white : const Color(0xFF0F172A),
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          Text(
-            'PrivateAgent enables hands-free voice control, smart screen action execution, and local privacy for your daily phone tasks.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.5,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Capabilities Cards Grid
-          Row(
-            children: [
-              Expanded(
-                child: _buildCapabilityCard(
-                  icon: Icons.shield_outlined,
-                  title: 'On-Device Privacy',
-                  desc: 'Secure key storage with zero telemetry data sharing.',
-                  color: const Color(0xFF10B981),
-                  isDark: isDark,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildCapabilityCard(
-                  icon: Icons.touch_app_rounded,
-                  title: 'Screen Automation',
-                  desc: 'Navigates apps & completes actions on screen.',
-                  color: const Color(0xFF38BDF8),
-                  isDark: isDark,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildCapabilityCard(
-                  icon: Icons.hub_rounded,
-                  title: 'Multi-LLM Engine',
-                  desc: 'Connect DeepSeek, Groq, NVIDIA or local Ollama.',
-                  color: const Color(0xFF8B5CF6),
-                  isDark: isDark,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildCapabilityCard(
-                  icon: Icons.picture_in_picture_alt_rounded,
-                  title: 'Floating HUD',
-                  desc: 'Background status overlay for instant control.',
-                  color: const Color(0xFFF59E0B),
-                  isDark: isDark,
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 24),
 
-          // Next Button
+          // --- Category Tag ---
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [
+                        const Color(0xFF6366F1).withOpacity(0.18),
+                        const Color(0xFF0EA5E9).withOpacity(0.10),
+                      ]
+                    : [
+                        const Color(0xFF4F46E5).withOpacity(0.10),
+                        const Color(0xFF0EA5E9).withOpacity(0.06),
+                      ],
+              ),
+              border: Border.all(
+                color: const Color(0xFF6366F1).withOpacity(isDark ? 0.35 : 0.22),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
+                  ).createShader(bounds),
+                  child: const Text(
+                    '\u2726',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'PRIVATE LOCAL AI ASSISTANT',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                    color: isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // --- Headline with gradient accent ---
+          ShaderMask(
+            shaderCallback: (bounds) => LinearGradient(
+              colors: isDark
+                  ? [Colors.white, const Color(0xFFC7D2FE)]
+                  : [const Color(0xFF0F172A), const Color(0xFF334155)],
+            ).createShader(bounds),
+            child: const Text(
+              'Your Phone,\nYour Rules.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -1.2,
+                height: 1.15,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              'Hands-free voice control, intelligent screen automation, and complete on-device privacy \u2014 no cloud dependency.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13.5,
+                height: 1.55,
+                fontWeight: FontWeight.w400,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // --- Feature Cards ---
+          _buildFeatureRow(
+            isDark: isDark,
+            icon1: Icons.shield_rounded,
+            title1: 'On-Device Privacy',
+            desc1: 'Zero telemetry. Keys stored locally on your device.',
+            colors1: const [Color(0xFF10B981), Color(0xFF059669)],
+            icon2: Icons.touch_app_rounded,
+            title2: 'Screen Automation',
+            desc2: 'Taps, swipes & navigates apps autonomously.',
+            colors2: const [Color(0xFF38BDF8), Color(0xFF0284C7)],
+          ),
+          const SizedBox(height: 12),
+          _buildFeatureRow(
+            isDark: isDark,
+            icon1: Icons.hub_rounded,
+            title1: 'Multi-LLM Engine',
+            desc1: 'DeepSeek, Groq, NVIDIA, Ollama \u2014 your choice.',
+            colors1: const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
+            icon2: Icons.picture_in_picture_alt_rounded,
+            title2: 'Floating HUD',
+            desc2: 'Always-on overlay for real-time task status.',
+            colors2: const [Color(0xFFF59E0B), Color(0xFFD97706)],
+          ),
+          const SizedBox(height: 28),
+
+          // --- CTA Button ---
           LiquidGlassButton(
             onPressed: () {
               _pageController.nextPage(
@@ -1082,10 +1141,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Continue to Permissions',
+                  'Get Started',
                   style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3,
                   ),
                 ),
                 SizedBox(width: 8),
@@ -1093,9 +1153,58 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
+
+          // --- Version badge ---
+          Text(
+            'v1.0 \u2022 Built for Android',
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+              color: isDark
+                  ? const Color(0xFF475569)
+                  : const Color(0xFFCBD5E1),
+            ),
+          ),
+          const SizedBox(height: 16),
         ],
       ),
+    );
+  }
+
+  Widget _buildFeatureRow({
+    required bool isDark,
+    required IconData icon1,
+    required String title1,
+    required String desc1,
+    required List<Color> colors1,
+    required IconData icon2,
+    required String title2,
+    required String desc2,
+    required List<Color> colors2,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildCapabilityCard(
+            icon: icon1,
+            title: title1,
+            desc: desc1,
+            gradientColors: colors1,
+            isDark: isDark,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildCapabilityCard(
+            icon: icon2,
+            title: title2,
+            desc: desc2,
+            gradientColors: colors2,
+            isDark: isDark,
+          ),
+        ),
+      ],
     );
   }
 
@@ -1103,7 +1212,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     required IconData icon,
     required String title,
     required String desc,
-    required Color color,
+    required List<Color> gradientColors,
     required bool isDark,
   }) {
     return LiquidGlassContainer(
@@ -1113,19 +1222,31 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                colors: [
+                  gradientColors[0].withOpacity(isDark ? 0.25 : 0.15),
+                  gradientColors[1].withOpacity(isDark ? 0.12 : 0.06),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              border: Border.all(
+                color: gradientColors[0].withOpacity(isDark ? 0.25 : 0.18),
+                width: 0.8,
+              ),
             ),
-            child: Icon(icon, size: 18, color: color),
+            child: Icon(icon, size: 18, color: gradientColors[0]),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Text(
             title,
             style: TextStyle(
               fontSize: 13,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
               color: isDark ? Colors.white : const Color(0xFF0F172A),
             ),
           ),
@@ -1134,7 +1255,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             desc,
             style: TextStyle(
               fontSize: 11,
-              height: 1.4,
+              height: 1.45,
               color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             ),
           ),
