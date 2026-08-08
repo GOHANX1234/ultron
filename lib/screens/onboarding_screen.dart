@@ -581,7 +581,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     return Scaffold(
       backgroundColor: isDark
           ? const Color(0xFF090D16)
-          : const Color(0xFFF1F5F9),
+          : const Color(0xFFF8FAFC),
       body: Stack(
         children: [
           // Dynamic Soft Ambient Liquid Background
@@ -596,7 +596,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           // Master Backdrop Blur Layer for Glass Diffusion
           Positioned.fill(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+              filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
               child: Container(color: Colors.transparent),
             ),
           ),
@@ -606,7 +606,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               children: [
                 // Top Navigation & Step Indicator Header
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 6),
                   child: _buildLiquidHeader(isDark),
                 ),
 
@@ -635,46 +635,66 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Widget _buildLiquidBackgroundGlows(bool isDark, double animValue) {
-    final shiftX = math.sin(animValue * math.pi * 2) * 35;
-    final shiftY = math.cos(animValue * math.pi * 2) * 35;
+    final shiftX = math.sin(animValue * math.pi * 2) * 40;
+    final shiftY = math.cos(animValue * math.pi * 2) * 40;
 
     return Positioned.fill(
       child: Stack(
         children: [
-          // Indigo Orb Top Right
+          // Vibrant Azure/Blue Orb Top Right
           Positioned(
-            top: -50 + shiftY,
-            right: -50 + shiftX,
+            top: -40 + shiftY,
+            right: -40 + shiftX,
             child: Container(
-              width: 300,
-              height: 300,
+              width: 340,
+              height: 340,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
                     isDark
-                        ? const Color(0xFF6366F1).withOpacity(0.30)
-                        : const Color(0xFF818CF8).withOpacity(0.20),
+                        ? const Color(0xFF0088CC).withOpacity(0.35)
+                        : const Color(0xFF38BDF8).withOpacity(0.32),
                     Colors.transparent,
                   ],
                 ),
               ),
             ),
           ),
-          // Cyan Orb Bottom Left
+          // Electric Violet Orb Bottom Left
           Positioned(
-            bottom: -70 - shiftY,
-            left: -70 - shiftX,
+            bottom: -60 - shiftY,
+            left: -60 - shiftX,
             child: Container(
-              width: 320,
-              height: 320,
+              width: 360,
+              height: 360,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
                     isDark
-                        ? const Color(0xFF0EA5E9).withOpacity(0.25)
-                        : const Color(0xFF38BDF8).withOpacity(0.18),
+                        ? const Color(0xFF6366F1).withOpacity(0.30)
+                        : const Color(0xFF818CF8).withOpacity(0.28),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Soft Cyan Middle
+          Positioned(
+            top: 250 + shiftX,
+            left: -80 + shiftY,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    isDark
+                        ? const Color(0xFF0EA5E9).withOpacity(0.20)
+                        : const Color(0xFFC084FC).withOpacity(0.22),
                     Colors.transparent,
                   ],
                 ),
@@ -688,8 +708,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   Widget _buildLiquidHeader(bool isDark) {
     return LiquidGlassContainer(
-      borderRadius: 20,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      borderRadius: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         children: [
           Row(
@@ -701,12 +721,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFF6366F1).withOpacity(0.8),
-                          const Color(0xFF0EA5E9).withOpacity(0.8),
-                        ],
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0088CC), Color(0xFF0055FF)],
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0088CC).withOpacity(0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
                     child: const Icon(
                       Icons.bubble_chart_rounded,
@@ -721,9 +745,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       Text(
                         'PRIVATE AGENT',
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.1,
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                       ),
@@ -741,25 +765,25 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   ),
                 ],
               ),
-              // Step Badge
+              // iOS Step Badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   color: isDark
-                      ? Colors.white.withOpacity(0.08)
-                      : Colors.black.withOpacity(0.05),
+                      ? Colors.white.withOpacity(0.10)
+                      : Colors.white.withOpacity(0.85),
                   border: Border.all(
                     color: isDark
-                        ? Colors.white.withOpacity(0.12)
+                        ? Colors.white.withOpacity(0.18)
                         : Colors.black.withOpacity(0.06),
                   ),
                 ),
                 child: Row(
                   children: [
                     Container(
-                      width: 6,
-                      height: 6,
+                      width: 7,
+                      height: 7,
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle,
                         color: Color(0xFF10B981),
@@ -769,10 +793,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     Text(
                       'STEP ${_currentStep + 1} OF 3',
                       style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                        color: isDark ? Colors.white70 : const Color(0xFF334155),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.6,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
                     ),
                   ],
@@ -781,78 +805,99 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             ],
           ),
           const SizedBox(height: 12),
-          // Progress Bar
-          Stack(
-            children: [
-              Container(
-                height: 5,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  color: isDark
-                      ? Colors.white.withOpacity(0.08)
-                      : Colors.black.withOpacity(0.06),
-                ),
+          // iOS Telegram Liquid Segment Bar
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              color: isDark
+                  ? Colors.black.withOpacity(0.25)
+                  : Colors.black.withOpacity(0.04),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withOpacity(0.08)
+                    : Colors.black.withOpacity(0.04),
               ),
-              AnimatedFractionallySizedBox(
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeOutCubic,
-                widthFactor: (_currentStep + 1) / 3.0,
-                child: Container(
-                  height: 5,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildStepTitle(0, 'Overview'),
-              _buildStepTitle(1, 'Permissions'),
-              _buildStepTitle(2, 'AI Setup'),
-            ],
+            ),
+            child: Row(
+              children: [
+                Expanded(child: _buildSegmentTab(0, 'Overview', Icons.auto_awesome_rounded, isDark)),
+                Expanded(child: _buildSegmentTab(1, 'Permissions', Icons.verified_user_rounded, isDark)),
+                Expanded(child: _buildSegmentTab(2, 'AI Setup', Icons.psychology_rounded, isDark)),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStepTitle(int stepIndex, String title) {
+  Widget _buildSegmentTab(int stepIndex, String title, IconData icon, bool isDark) {
     final isActive = _currentStep == stepIndex;
     final isDone = _currentStep > stepIndex;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Row(
-      children: [
-        if (isDone)
-          const Padding(
-            padding: EdgeInsets.only(right: 4),
-            child: Icon(
-              Icons.check_circle_rounded,
-              size: 12,
-              color: Color(0xFF10B981),
-            ),
-          ),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: isActive || isDone ? FontWeight.bold : FontWeight.w500,
-            color: isActive
-                ? (isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5))
-                : isDone
-                ? const Color(0xFF10B981)
-                : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
-          ),
+    return GestureDetector(
+      onTap: () {
+        if (isDone || isActive || stepIndex <= _currentStep) {
+          _pageController.animateToPage(
+            stepIndex,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          gradient: isActive
+              ? const LinearGradient(
+                  colors: [Color(0xFF0088CC), Color(0xFF0066FF)],
+                )
+              : null,
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF0088CC).withOpacity(0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
-      ],
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isDone ? Icons.check_circle_rounded : icon,
+              size: 13,
+              color: isActive
+                  ? Colors.white
+                  : isDone
+                      ? const Color(0xFF10B981)
+                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                  color: isActive
+                      ? Colors.white
+                      : isDone
+                          ? (isDark ? Colors.white70 : const Color(0xFF334155))
+                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -941,7 +986,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ),
             ),
             child: const Text(
-              '✦ PRIVATE LOCAL AI ASSISTANT',
+              'âœ¦ PRIVATE LOCAL AI ASSISTANT',
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w700,
@@ -1739,19 +1784,39 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       onTap: () => _selectProvider(id),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 90,
-        child: LiquidGlassContainer(
-          borderRadius: 16,
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-          borderColor: isSelected
-              ? const Color(0xFF6366F1)
-              : (isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06)),
+        width: 98,
+        margin: const EdgeInsets.only(right: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
           gradient: isSelected
-              ? LinearGradient(
-                  colors: [
-                    const Color(0xFF6366F1).withOpacity(0.25),
-                    const Color(0xFF0EA5E9).withOpacity(0.15),
-                  ],
+              ? const LinearGradient(
+                  colors: [Color(0xFF0088CC), Color(0xFF0055FF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF0088CC).withOpacity(0.38),
+                    blurRadius: 14,
+                    spreadRadius: -1,
+                    offset: const Offset(0, 5),
+                  ),
+                ]
+              : null,
+        ),
+        child: LiquidGlassContainer(
+          borderRadius: 18,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          borderColor: isSelected
+              ? Colors.white.withOpacity(0.5)
+              : (isDark ? Colors.white.withOpacity(0.12) : Colors.white.withOpacity(0.8)),
+          gradient: isSelected
+              ? const LinearGradient(
+                  colors: [Color(0xFF0088CC), Color(0xFF0055FF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 )
               : null,
           child: Column(
@@ -1759,23 +1824,23 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             children: [
               Icon(
                 icon,
-                size: 20,
+                size: 22,
                 color: isSelected
-                    ? const Color(0xFF6366F1)
-                    : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+                    ? Colors.white
+                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
               ),
-              const SizedBox(height: 5),
+              const SizedBox(height: 6),
               Text(
                 label,
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                   color: isSelected
-                      ? (isDark ? Colors.white : const Color(0xFF4F46E5))
-                      : (isDark ? Colors.white54 : const Color(0xFF64748B)),
+                      ? Colors.white
+                      : (isDark ? Colors.white70 : const Color(0xFF334155)),
                 ),
               ),
             ],
@@ -1797,48 +1862,63 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 6),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.3,
+              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+            ),
           ),
         ),
-        const SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             color: isDark
-                ? Colors.black.withOpacity(0.2)
-                : Colors.white.withOpacity(0.6),
+                ? Colors.black.withOpacity(0.30)
+                : Colors.white.withOpacity(0.85),
             border: Border.all(
               color: isDark
-                  ? Colors.white.withOpacity(0.1)
-                  : Colors.black.withOpacity(0.06),
+                  ? Colors.white.withOpacity(0.14)
+                  : Colors.white,
+              width: 1.2,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withOpacity(0.2)
+                    : const Color(0x0F0F172A),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: TextField(
             controller: controller,
             obscureText: obscure,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
               color: isDark ? Colors.white : const Color(0xFF0F172A),
             ),
             decoration: InputDecoration(
               prefixIcon: Icon(
                 icon,
-                size: 18,
-                color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                size: 20,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF0088CC),
               ),
               hintText: hint,
               hintStyle: TextStyle(
-                fontSize: 12.5,
-                color: isDark ? Colors.white30 : Colors.black38,
+                fontSize: 13,
+                fontWeight: FontWeight.normal,
+                color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
               ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 12,
+                horizontal: 16,
+                vertical: 14,
               ),
               border: InputBorder.none,
               suffixIcon: suffix,
@@ -1861,7 +1941,7 @@ class LiquidGlassContainer extends StatelessWidget {
   const LiquidGlassContainer({
     super.key,
     required this.child,
-    this.borderRadius = 20.0,
+    this.borderRadius = 22.0,
     this.padding = const EdgeInsets.all(16.0),
     this.borderColor,
     this.gradient,
@@ -1877,29 +1957,30 @@ class LiquidGlassContainer extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: isDark
               ? [
-                  Colors.white.withOpacity(0.08),
-                  Colors.white.withOpacity(0.03),
+                  Colors.white.withOpacity(0.12),
+                  Colors.white.withOpacity(0.04),
                 ]
               : [
-                  Colors.white.withOpacity(0.85),
-                  Colors.white.withOpacity(0.60),
+                  Colors.white.withOpacity(0.82),
+                  Colors.white.withOpacity(0.48),
                 ],
         );
 
     final borderGrad = borderColor != null
-        ? Border.all(color: borderColor!, width: 1.0)
+        ? Border.all(color: borderColor!, width: 1.2)
         : Border.all(
             color: isDark
-                ? Colors.white.withOpacity(0.15)
-                : Colors.white.withOpacity(0.60),
-            width: 1.0,
+                ? Colors.white.withOpacity(0.18)
+                : Colors.white.withOpacity(0.75),
+            width: 1.2,
           );
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
+        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
           padding: padding,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(borderRadius),
@@ -1907,10 +1988,12 @@ class LiquidGlassContainer extends StatelessWidget {
             border: borderGrad,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.25 : 0.04),
-                blurRadius: 16,
+                color: isDark
+                    ? Colors.black.withOpacity(0.35)
+                    : const Color(0x1A0F172A),
+                blurRadius: 20,
                 spreadRadius: -2,
-                offset: const Offset(0, 6),
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -1941,18 +2024,24 @@ class LiquidGlassButton extends StatelessWidget {
     if (disabled || onPressed == null) {
       return Container(
         width: double.infinity,
-        height: 50,
+        height: 52,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           color: isDark
-              ? Colors.white.withOpacity(0.05)
+              ? Colors.white.withOpacity(0.06)
               : Colors.black.withOpacity(0.05),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.08)
+                : Colors.black.withOpacity(0.06),
+          ),
         ),
         child: Center(
           child: DefaultTextStyle(
             style: TextStyle(
-              color: isDark ? Colors.white30 : Colors.black38,
+              color: isDark ? Colors.white30 : const Color(0xFF94A3B8),
               fontWeight: FontWeight.bold,
+              fontSize: 14,
             ),
             child: child,
           ),
@@ -1962,19 +2051,24 @@ class LiquidGlassButton extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      height: 50,
+      height: 52,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         gradient: const LinearGradient(
-          colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
+          colors: [Color(0xFF0088CC), Color(0xFF0055FF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.35),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6366F1).withOpacity(0.35),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF0088CC).withOpacity(0.40),
+            blurRadius: 18,
+            spreadRadius: -2,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -1985,7 +2079,7 @@ class LiquidGlassButton extends StatelessWidget {
           foregroundColor: Colors.white,
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
           ),
         ),
         child: child,
