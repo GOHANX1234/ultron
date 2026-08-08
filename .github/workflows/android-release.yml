@@ -34,6 +34,36 @@ jobs:
       - name: Run tests
         run: flutter test
 
+      - name: Setup Release Keystore
+        env:
+          ENCODED_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ENCODED_KEYSTORE" ]; then
+            echo "Using repository release keystore secret..."
+            echo "$ENCODED_KEYSTORE" | base64 -d > android/app/release.keystore
+            cat <<EOF > android/key.properties
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=release.keystore
+          EOF
+          else
+            echo "Generating automated permanent release keystore for release build..."
+            keytool -genkeypair -v -keystore android/app/release.keystore \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -alias ultron-key -storepass ultronsecretpass -keypass ultronsecretpass \
+              -dname "CN=Ultron, OU=Dev, O=Ultron, L=City, S=State, C=US"
+            cat <<EOF > android/key.properties
+          storePassword=ultronsecretpass
+          keyPassword=ultronsecretpass
+          keyAlias=ultron-key
+          storeFile=release.keystore
+          EOF
+          fi
+
       - name: Build universal APK
         run: |
           flutter build apk --release

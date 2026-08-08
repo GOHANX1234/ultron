@@ -1,0 +1,9 @@
+# Android Release Keystore Configuration Example
+# Copy this file to android/key.properties and update values with your own keystore details.
+# To generate a new permanent keystore locally on a PC or Linux terminal, run:
+# keytool -genkeypair -v -keystore android/app/release.keystore -keyalg RSA -keysize 2048 -validity 10000 -alias ultron-key
+
+storePassword=YOUR_STORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=ultron-key
+storeFile=release.keystore
