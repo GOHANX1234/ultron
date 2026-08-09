@@ -502,9 +502,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               // Floating Glass Header (Replaces heavy standard AppBar)
               _buildFloatingHeader(context, isDark),
 
-              // Mode Pill Selector (Chat / Agent)
-              _buildModeSelector(isDark),
-
               // API key warning banner if not configured
               if (!_aiService.isConfigured) _buildApiWarningBanner(context, isDark),
 
@@ -1179,22 +1176,117 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildModeDropdownChip(bool isDark) {
+    return PopupMenuButton<String>(
+      initialValue: _mode,
+      onSelected: (String value) {
+        setState(() {
+          _mode = value;
+        });
+      },
+      position: PopupMenuPosition.under,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      elevation: 6,
+      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+        PopupMenuItem<String>(
+          value: 'chat',
+          child: Row(
+            children: [
+              Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 16,
+                color: _mode == 'chat' ? const Color(0xFF6366F1) : (isDark ? Colors.white70 : Colors.black87),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Chat Mode',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _mode == 'chat' ? const Color(0xFF6366F1) : (isDark ? Colors.white : Colors.black87),
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'agent',
+          child: Row(
+            children: [
+              Icon(
+                Icons.smart_toy_outlined,
+                size: 16,
+                color: _mode == 'agent' ? const Color(0xFF6366F1) : (isDark ? Colors.white70 : Colors.black87),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Agent Mode',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _mode == 'agent' ? const Color(0xFF6366F1) : (isDark ? Colors.white : Colors.black87),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.16) : Colors.black.withValues(alpha: 0.08),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _mode == 'chat' ? Icons.chat_bubble_outline_rounded : Icons.smart_toy_outlined,
+              size: 14,
+              color: isDark ? Colors.white70 : const Color(0xFF475569),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              _mode == 'chat' ? 'Chat' : 'Agent',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : const Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(width: 3),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 16,
+              color: isDark ? Colors.white54 : const Color(0xFF64748B),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInputBar(bool isDark) {
     return SafeArea(
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(22),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
               decoration: BoxDecoration(
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.white.withValues(alpha: 0.75),
-                borderRadius: BorderRadius.circular(28),
+                    : Colors.white.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(22),
                 border: Border.all(
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.16)
@@ -1212,96 +1304,133 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ],
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Voice Mic Button with pulse effect when listening
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _isListening
-                          ? Colors.redAccent
-                          : (isDark
-                                ? Colors.white.withValues(alpha: 0.1)
-                                : Colors.black.withValues(alpha: 0.05)),
-                      border: Border.all(
-                        color: _isListening
-                            ? Colors.redAccent
-                            : (isDark
-                                  ? Colors.white.withValues(alpha: 0.2)
-                                  : Colors.black.withValues(alpha: 0.1)),
-                        width: 1.2,
+                  // Top Row inside input bar: Mode selector dropdown chip
+                  Row(
+                    children: [
+                      _buildModeDropdownChip(isDark),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Bottom Row: Text field + side-by-side Voice & Upward Arrow Send Buttons
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _textController,
+                          minLines: 1,
+                          maxLines: 5,
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            color: isDark ? Colors.white : const Color(0xFF1E293B),
+                          ),
+                          decoration: InputDecoration(
+                            hintText: _isListening
+                                ? 'Listening...'
+                                : (_mode == 'chat'
+                                    ? 'Type a message...'
+                                    : 'Type an agent command...'),
+                            hintStyle: TextStyle(
+                              fontSize: 14.5,
+                              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: _isLoading ? null : (text) => _sendMessage(text),
+                        ),
                       ),
-                      boxShadow: _isListening
-                          ? [
-                              BoxShadow(
-                                color: Colors.redAccent.withValues(alpha: 0.5),
-                                blurRadius: 14,
-                                spreadRadius: 2,
+                      const SizedBox(width: 8),
+
+                      // Side-by-Side Voice Mic + ChatGPT Style Upward Arrow Send Button
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Small Voice Mic Button
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _isListening
+                                  ? Colors.redAccent
+                                  : (isDark
+                                        ? Colors.white.withValues(alpha: 0.10)
+                                        : Colors.black.withValues(alpha: 0.05)),
+                              border: Border.all(
+                                color: _isListening
+                                    ? Colors.redAccent
+                                    : (isDark
+                                          ? Colors.white.withValues(alpha: 0.18)
+                                          : Colors.black.withValues(alpha: 0.10)),
+                                width: 1,
                               ),
-                            ]
-                          : null,
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                        color: _isListening
-                            ? Colors.white
-                            : (isDark ? Colors.white : const Color(0xFF4F46E5)),
-                        size: 20,
-                      ),
-                      onPressed: _isLoading ? null : _toggleVoice,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
+                              boxShadow: _isListening
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.redAccent.withValues(alpha: 0.45),
+                                        blurRadius: 10,
+                                        spreadRadius: 1,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              icon: Icon(
+                                _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                                color: _isListening
+                                    ? Colors.white
+                                    : (isDark ? Colors.white70 : const Color(0xFF475569)),
+                                size: 18,
+                              ),
+                              onPressed: _isLoading ? null : _toggleVoice,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
 
-                  // Command text input field
-                  Expanded(
-                    child: TextField(
-                      controller: _textController,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                          // Small ChatGPT Style Upward Arrow Send Button
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF6366F1).withValues(alpha: 0.40),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              icon: const Icon(
+                                Icons.arrow_upward_rounded,
+                                size: 19,
+                                color: Colors.white,
+                              ),
+                              onPressed: _isLoading ? null : () => _sendMessage(_textController.text),
+                            ),
+                          ),
+                        ],
                       ),
-                      decoration: InputDecoration(
-                        hintText: _isListening ? 'Listening...' : 'Type a command...',
-                        hintStyle: TextStyle(
-                          fontSize: 14,
-                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: InputBorder.none,
-                      ),
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: _isLoading ? null : (text) => _sendMessage(text),
-                    ),
-                  ),
-
-                  // Send Action Button with Gradient
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF6366F1).withValues(alpha: 0.45),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.send_rounded,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                      onPressed: _isLoading ? null : () => _sendMessage(_textController.text),
-                    ),
+                    ],
                   ),
                 ],
               ),
