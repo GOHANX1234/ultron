@@ -1072,54 +1072,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           ),
           const SizedBox(height: 24),
 
-          // --- Category Tag ---
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                colors: isDark
-                    ? [
-                        const Color(0xFF6366F1).withOpacity(0.18),
-                        const Color(0xFF0EA5E9).withOpacity(0.10),
-                      ]
-                    : [
-                        const Color(0xFF4F46E5).withOpacity(0.10),
-                        const Color(0xFF0EA5E9).withOpacity(0.06),
-                      ],
-              ),
-              border: Border.all(
-                color: const Color(0xFF6366F1).withOpacity(isDark ? 0.35 : 0.22),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ShaderMask(
-                  shaderCallback: (bounds) => const LinearGradient(
-                    colors: [Color(0xFF8B5CF6), Color(0xFF06B6D4)],
-                  ).createShader(bounds),
-                  child: const Icon(
-                    Icons.auto_awesome,
-                    size: 14,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'INTELLIGENT AI ASSISTANT',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                    color: isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
           // --- Headline with gradient accent ---
           ShaderMask(
             shaderCallback: (bounds) => LinearGradient(
@@ -1139,22 +1091,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ),
             ),
           ),
-          const SizedBox(height: 12),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              'Hands-free voice control, intelligent screen automation, and complete on-device privacy \u2014 no cloud dependency.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13.5,
-                height: 1.55,
-                fontWeight: FontWeight.w400,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-              ),
-            ),
-          ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
           // --- Feature Cards ---
           _buildFeatureRow(

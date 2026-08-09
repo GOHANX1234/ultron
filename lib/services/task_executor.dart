@@ -128,6 +128,13 @@ Rules:
       await ScreenAutomationService.logToNative(
         "[TaskExecutor] Accessibility service not running, returning early.",
       );
+      await TaskHistoryLogger.logTask(
+        userGoal,
+        'Failed',
+        0,
+        0,
+        ['Accessibility service is not enabled.'],
+      );
       return 'Accessibility service is not enabled. Go to Settings \u2192 Accessibility \u2192 Ultron-3 Screen Control and enable it.';
     }
 

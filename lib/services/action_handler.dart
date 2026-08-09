@@ -9,6 +9,7 @@ import 'shizuku_service.dart';
 import 'screen_automation_service.dart';
 import 'task_executor.dart';
 import 'ai_service.dart';
+import 'task_history_logger.dart';
 
 class ActionHandler {
   final AppLauncherService _appLauncher = AppLauncherService();
@@ -30,6 +31,7 @@ class ActionHandler {
     AgentAction action, {
     AiService? aiService,
     void Function(String)? onProgress,
+    String? userGoal,
   }) async {
     try {
       String result;
@@ -147,7 +149,7 @@ class ActionHandler {
         // ─── Multi-Step Task Execution ────────────────────────
 
         case 'execute_task':
-          final goal = action.params['goal'] as String? ?? action.response;
+          final goal = action.params['goal'] as String? ?? userGoal ?? action.response;
           if (aiService == null) {
             result = 'AI service not available for task execution.';
             break;
@@ -167,12 +169,50 @@ class ActionHandler {
           result = action.response;
       }
 
-      return AgentActionResult(
+      final actionResult = AgentActionResult(
         actionType: action.action,
         success: true,
         details: result,
       );
+
+      // Log non-execute_task actions to TaskHistoryLogger
+      if (action.action != 'execute_task') {
+        final goalText = userGoal ??
+            (action.params['goal'] as String?) ??
+            (action.params['app_name'] != null ? 'Open ${action.params['app_name']}' : null) ??
+            (action.params['contact_name'] != null ? 'Action for ${action.params['contact_name']}' : null) ??
+            action.response.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+
+        final finalGoal = goalText.isNotEmpty ? goalText : 'Execute ${action.action}';
+
+        await TaskHistoryLogger.logTask(
+          finalGoal,
+          'Success',
+          0,
+          1,
+          [
+            'Action: ${action.action}',
+            if (action.params.isNotEmpty) 'Params: ${action.params}',
+            'Details: $result',
+          ],
+        );
+      }
+
+      return actionResult;
     } catch (e) {
+      if (action.action != 'execute_task') {
+        final goalText = userGoal ?? action.action;
+        await TaskHistoryLogger.logTask(
+          goalText,
+          'Failed',
+          0,
+          1,
+          [
+            'Action: ${action.action}',
+            'Error: $e',
+          ],
+        );
+      }
       return AgentActionResult(
         actionType: action.action,
         success: false,

@@ -159,6 +159,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         // Execute the action (pass aiService for multi-step tasks)
         final result = await _actionHandler.execute(
           action,
+          userGoal: text.trim(),
           aiService: _aiService,
           onProgress: (msg) {
             developer.log('Task progress: $msg', name: 'Ultron-3');
