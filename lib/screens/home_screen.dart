@@ -595,35 +595,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ),
                   const Spacer(),
-                  // Brand Title with Gradient
-                  ShaderMask(
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [Color(0xFF6366F1), Color(0xFF0EA5E9), Color(0xFF38BDF8)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ).createShader(bounds),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [
-                                const Color(0xFF6366F1).withValues(alpha: 0.8),
-                                const Color(0xFF0EA5E9).withValues(alpha: 0.8),
-                              ],
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.smart_toy_rounded,
-                            size: 16,
-                            color: Colors.white,
-                          ),
+                  // Brand Title with Gradient & App Logo
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(7),
+                        child: Image.asset(
+                          'assets/app-logo.png',
+                          width: 24,
+                          height: 24,
+                          fit: BoxFit.cover,
                         ),
-                        const SizedBox(width: 8),
-                        const Text(
+                      ),
+                      const SizedBox(width: 8),
+                      ShaderMask(
+                        shaderCallback: (bounds) => const LinearGradient(
+                          colors: [Color(0xFF6366F1), Color(0xFF0EA5E9), Color(0xFF38BDF8)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ).createShader(bounds),
+                        child: const Text(
                           'Ultron-3',
                           style: TextStyle(
                             fontSize: 19,
@@ -632,8 +624,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             color: Colors.white,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                   const Spacer(),
                   // New Chat Action
@@ -950,35 +942,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 16),
-          // Gemini/Ultron Sparkle Hero Icon
-          Center(
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF6366F1).withValues(alpha: isDark ? 0.25 : 0.15),
-                    const Color(0xFF0EA5E9).withValues(alpha: isDark ? 0.15 : 0.08),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                border: Border.all(
-                  color: const Color(0xFF6366F1).withValues(alpha: isDark ? 0.35 : 0.2),
-                  width: 1.2,
-                ),
-              ),
-              child: const Icon(
-                Icons.auto_awesome,
-                size: 38,
-                color: Color(0xFF6366F1),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
 
           // Greeting text
           Text(
@@ -1331,18 +1295,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.smart_toy_rounded,
-                      color: Colors.white,
-                      size: 20,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      'assets/app-logo.png',
+                      width: 28,
+                      height: 28,
+                      fit: BoxFit.cover,
                     ),
                   ),
                   const SizedBox(width: 12),
