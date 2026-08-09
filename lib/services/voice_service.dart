@@ -23,7 +23,7 @@ class VoiceService {
     await _tts.setLanguage('en-US');
     await _tts.setSpeechRate(0.48);
     await _tts.setVolume(1.0);
-    await _tts.setPitch(0.70); // Deep male voice pitch
+    await _tts.setPitch(0.50); // Deep male voice pitch
 
     await _selectMaleVoice();
   }
@@ -33,6 +33,8 @@ class VoiceService {
       final voices = await _tts.getVoices;
       if (voices is List && voices.isNotEmpty) {
         Map? selectedVoice;
+        Map? fallbackVoice;
+
         for (var voice in voices) {
           if (voice is Map) {
             final name = (voice['name'] ?? '').toString().toLowerCase();
@@ -41,20 +43,34 @@ class VoiceService {
 
             if (locale.isNotEmpty && !locale.startsWith('en')) continue;
 
-            // Skip explicit female voices
-            if (name.contains('female') ||
+            // Explicit female voice filters to avoid (including Google TTS female identifiers)
+            final isFemale = name.contains('female') ||
                 name.contains('woman') ||
                 name.contains('girl') ||
                 name.contains('zira') ||
                 name.contains('hazel') ||
                 name.contains('samantha') ||
                 name.contains('victoria') ||
-                gender == 'female') {
-              continue;
-            }
+                name.contains('karen') ||
+                name.contains('fiona') ||
+                name.contains('moira') ||
+                name.contains('veena') ||
+                name.contains('en-us-x-sfg') || // Google US Female
+                name.contains('en-us-x-tpf') || // Google US Female
+                name.contains('en-us-x-tpc') || // Google US Female
+                name.contains('en-us-x-sfa') ||
+                name.contains('en-us-x-sfb') ||
+                name.contains('en-us-x-sfe') ||
+                name.contains('en-us-x-sfh') ||
+                gender == 'female';
 
-            // High priority male voices (Android Google TTS male models & standard voices)
-            if (name.contains('male') ||
+            if (isFemale) continue;
+
+            // Save first non-female voice as potential fallback
+            fallbackVoice ??= voice;
+
+            // Explicit male voice filters (Android Google TTS male tags & standard voices)
+            final isMale = name.contains('male') ||
                 name.contains('guy') ||
                 name.contains('man') ||
                 name.contains('david') ||
@@ -63,25 +79,28 @@ class VoiceService {
                 name.contains('george') ||
                 name.contains('alex') ||
                 name.contains('fred') ||
-                name.contains('en-us-x-sfg') ||
-                name.contains('en-us-x-iom') ||
-                name.contains('en-us-x-iob') ||
-                name.contains('en-us-x-tpf') ||
-                name.contains('en-us-x-tpc') ||
-                name.contains('en-us-x-iol') ||
-                name.contains('en-us-x-sfd') ||
-                name.contains('en-us-x-gqd') ||
-                gender == 'male') {
+                name.contains('bruce') ||
+                name.contains('aaron') ||
+                name.contains('en-us-x-iom') || // Google US Male
+                name.contains('en-us-x-iob') || // Google US Male
+                name.contains('en-us-x-iol') || // Google US Male
+                name.contains('en-us-x-sfd') || // Google US Male
+                name.contains('en-us-x-gqd') || // Google US Male
+                name.contains('en-us-x-und') || // Google US Male
+                gender == 'male';
+
+            if (isMale) {
               selectedVoice = voice;
               break;
             }
           }
         }
 
-        if (selectedVoice != null) {
+        final targetVoice = selectedVoice ?? fallbackVoice;
+        if (targetVoice != null) {
           await _tts.setVoice({
-            "name": selectedVoice["name"],
-            "locale": selectedVoice["locale"]
+            "name": targetVoice["name"].toString(),
+            "locale": targetVoice["locale"].toString(),
           });
         }
       }
@@ -124,7 +143,7 @@ class VoiceService {
     if (text.isEmpty) return;
     try {
       await _selectMaleVoice();
-      await _tts.setPitch(0.70);
+      await _tts.setPitch(0.50);
     } catch (_) {}
     await _tts.speak(text);
   }
