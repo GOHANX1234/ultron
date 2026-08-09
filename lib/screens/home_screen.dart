@@ -537,32 +537,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return SafeArea(
       bottom: false,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(24),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.white.withValues(alpha: 0.75),
-                borderRadius: BorderRadius.circular(22),
+                    ? Colors.white.withValues(alpha: 0.09)
+                    : Colors.white.withValues(alpha: 0.78),
+                borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: isDark
-                      ? Colors.white.withValues(alpha: 0.14)
-                      : Colors.white.withValues(alpha: 0.85),
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.white.withValues(alpha: 0.88),
                   width: 1.0,
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: isDark
-                        ? Colors.black.withValues(alpha: 0.25)
+                        ? Colors.black.withValues(alpha: 0.28)
                         : const Color(0x0C0F172A),
-                    blurRadius: 16,
+                    blurRadius: 18,
                     spreadRadius: -2,
-                    offset: const Offset(0, 4),
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
@@ -583,29 +583,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        width: 24,
-                        height: 24,
+                        width: 28,
+                        height: 28,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(7),
+                          borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF6366F1).withValues(alpha: 0.25),
-                              blurRadius: 6,
+                              color: const Color(0xFF6366F1).withValues(alpha: 0.30),
+                              blurRadius: 8,
                               spreadRadius: 0,
                             ),
                           ],
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(7),
+                          borderRadius: BorderRadius.circular(8),
                           child: Image.asset(
                             'assets/app-logo.png',
-                            width: 24,
-                            height: 24,
+                            width: 28,
+                            height: 28,
                             fit: BoxFit.cover,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 10),
                       ShaderMask(
                         shaderCallback: (bounds) => const LinearGradient(
                           colors: [Color(0xFF6366F1), Color(0xFF0EA5E9), Color(0xFF38BDF8)],
@@ -615,7 +615,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         child: const Text(
                           'Ultron-3',
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: 19,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.4,
                             color: Colors.white,
@@ -632,7 +632,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     isDark: isDark,
                     onPressed: _isLoading ? null : _startNewChat,
                   ),
-                  const SizedBox(width: 5),
+                  const SizedBox(width: 6),
                   // Settings Action
                   _buildHeaderIconButton(
                     icon: Icons.settings_rounded,
@@ -677,17 +677,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: Tooltip(
           message: tooltip,
           child: Container(
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: isDark
-                  ? Colors.white.withValues(alpha: 0.07)
-                  : Colors.black.withValues(alpha: 0.04),
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
               icon,
-              size: 19,
+              size: 20,
               color: isDark
                   ? (onPressed == null ? Colors.white30 : Colors.white)
                   : (onPressed == null ? Colors.black26 : const Color(0xFF1E293B)),
@@ -952,16 +952,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     final suggestions = _mode == 'chat'
         ? [
-            {'icon': Icons.email_outlined, 'title': 'Write a professional email'},
-            {'icon': Icons.lightbulb_outline_rounded, 'title': 'Explain quantum computing'},
-            {'icon': Icons.rocket_launch_outlined, 'title': 'Brainstorm mobile app ideas'},
-            {'icon': Icons.draw_outlined, 'title': 'Write a poem about robots'},
+            {'icon': Icons.auto_awesome_rounded, 'title': 'Summarize recent news & tech trends'},
+            {'icon': Icons.code_rounded, 'title': 'Write code snippet for Flutter animation'},
+            {'icon': Icons.lightbulb_outline_rounded, 'title': 'Explain quantum computing simply'},
+            {'icon': Icons.edit_note_rounded, 'title': 'Draft a concise professional email'},
           ]
         : [
-            {'icon': Icons.play_circle_outline_rounded, 'title': 'Open YouTube & find videos'},
-            {'icon': Icons.call_outlined, 'title': 'Call Mom'},
-            {'icon': Icons.volume_up_outlined, 'title': 'Set volume to 80%'},
-            {'icon': Icons.screen_search_desktop_outlined, 'title': 'What\'s on my screen?'},
+            {'icon': Icons.apps_rounded, 'title': 'Open WhatsApp and send message'},
+            {'icon': Icons.contact_phone_outlined, 'title': 'Find Mom in contacts and call'},
+            {'icon': Icons.volume_up_rounded, 'title': 'Adjust system volume to 80%'},
+            {'icon': Icons.screenshot_monitor_rounded, 'title': 'Analyze what is on my screen'},
           ];
 
     return SingleChildScrollView(
