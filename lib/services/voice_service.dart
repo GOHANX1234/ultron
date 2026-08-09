@@ -102,11 +102,13 @@ class VoiceService {
         await modelDir.create(recursive: true);
       }
 
-      const baseUrl =
-          'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium';
+      const tokensUrl =
+          'https://huggingface.co/csukuangfj/vits-piper-en_US-lessac-medium/resolve/main/tokens.txt';
+      const modelUrl =
+          'https://huggingface.co/csukuangfj/vits-piper-en_US-lessac-medium/resolve/main/en_US-lessac-medium.onnx';
 
       onProgress?.call(0.05, 'Downloading model tokens...');
-      final tokensRes = await http.get(Uri.parse('$baseUrl/tokens.txt'));
+      final tokensRes = await http.get(Uri.parse(tokensUrl));
       if (tokensRes.statusCode == 200) {
         await File(tokensPath).writeAsBytes(tokensRes.bodyBytes);
       } else {
@@ -114,7 +116,7 @@ class VoiceService {
       }
 
       onProgress?.call(0.10, 'Downloading neural TTS voice model (~63 MB)...');
-      final request = http.Request('GET', Uri.parse('$baseUrl/en_US-lessac-medium.onnx'));
+      final request = http.Request('GET', Uri.parse(modelUrl));
       final response = await http.Client().send(request);
 
       if (response.statusCode != 200) {
