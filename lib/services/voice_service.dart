@@ -175,7 +175,7 @@ class VoiceService {
 
       if (_sherpaTts != null) {
         // Generate high quality neural male speech
-        final audio = _sherpaTts!.generate(text.trim());
+        final audio = _sherpaTts!.generate(text: text.trim());
         if (audio.samples.isNotEmpty) {
           final wavBytes = _createWavBuffer(audio.samples, audio.sampleRate);
           await _audioPlayer.stop();
