@@ -63,7 +63,7 @@ class VoiceService {
             dataDir: dataDirPath,
           ),
           numThreads: 2,
-          debug: 0,
+          debug: false,
         ),
       );
 
@@ -175,7 +175,7 @@ class VoiceService {
 
       if (_sherpaTts != null) {
         // Generate high quality neural male speech
-        final audio = _sherpaTts!.generate(text.trim(), sid: 0, speed: 1.0);
+        final audio = _sherpaTts!.generate(text.trim());
         if (audio.samples.isNotEmpty) {
           final wavBytes = _createWavBuffer(audio.samples, audio.sampleRate);
           await _audioPlayer.stop();
