@@ -9,6 +9,83 @@ import '../services/ai_service.dart';
 import '../services/screen_automation_service.dart';
 import 'home_screen.dart';
 
+/// Custom painter for the Gemini-style multi-faceted sparkle icon
+class GeminiSparkleIconPainter extends CustomPainter {
+  final double animationValue;
+  final bool isDark;
+
+  GeminiSparkleIconPainter({required this.animationValue, required this.isDark});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width * 0.38;
+
+    // Draw the four-pointed star (Gemini-style sparkle)
+    final starPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          const Color(0xFF8B5CF6),
+          const Color(0xFF06B6D4),
+          const Color(0xFF3B82F6),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+    // Main four-pointed star
+    final path = Path();
+    final innerRadius = radius * 0.28;
+    for (int i = 0; i < 4; i++) {
+      final angle = (i * math.pi / 2) - math.pi / 2 + (animationValue * 0.15);
+      final outerX = center.dx + radius * math.cos(angle);
+      final outerY = center.dy + radius * math.sin(angle);
+      final midAngle1 = angle - math.pi / 8;
+      final midAngle2 = angle + math.pi / 8;
+      final inner1X = center.dx + innerRadius * math.cos(midAngle1);
+      final inner1Y = center.dy + innerRadius * math.sin(midAngle1);
+      final inner2X = center.dx + innerRadius * math.cos(midAngle2);
+      final inner2Y = center.dy + innerRadius * math.sin(midAngle2);
+
+      if (i == 0) {
+        path.moveTo(inner1X, inner1Y);
+      } else {
+        path.lineTo(inner1X, inner1Y);
+      }
+      // Cubic bezier for smooth curves
+      path.quadraticBezierTo(outerX, outerY, inner2X, inner2Y);
+    }
+    path.close();
+    canvas.drawPath(path, starPaint);
+
+    // Inner glow circle
+    final glowPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          Colors.white.withOpacity(0.5),
+          Colors.white.withOpacity(0.0),
+        ],
+      ).createShader(Rect.fromCircle(center: center, radius: innerRadius * 1.2));
+    canvas.drawCircle(center, innerRadius * 0.9, glowPaint);
+
+    // Small satellite sparkles
+    final sparkleRadius = radius * 0.06;
+    final sparklePaint = Paint()..color = Colors.white.withOpacity(0.85);
+    for (int i = 0; i < 3; i++) {
+      final angle = (i * math.pi * 2 / 3) + animationValue * math.pi * 2;
+      final dist = radius * (0.65 + 0.12 * math.sin(animationValue * math.pi * 4 + i));
+      final sx = center.dx + dist * math.cos(angle);
+      final sy = center.dy + dist * math.sin(angle);
+      canvas.drawCircle(Offset(sx, sy), sparkleRadius * (0.5 + 0.5 * math.sin(animationValue * math.pi * 2 + i)), sparklePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant GeminiSparkleIconPainter oldDelegate) {
+    return oldDelegate.animationValue != animationValue;
+  }
+}
+
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -25,6 +102,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   late AnimationController _liquidAnimationController;
   late Animation<double> _liquidAnimation;
+  late AnimationController _heroIconController;
+  late Animation<double> _heroIconAnimation;
 
   int _currentStep = 0;
   bool _isAccessibilityGranted = false;
@@ -55,12 +134,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     _liquidAnimationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 12),
+      duration: const Duration(seconds: 16),
     )..repeat(reverse: true);
 
     _liquidAnimation = CurvedAnimation(
       parent: _liquidAnimationController,
       curve: Curves.easeInOutSine,
+    );
+
+    _heroIconController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 20),
+    )..repeat();
+
+    _heroIconAnimation = CurvedAnimation(
+      parent: _heroIconController,
+      curve: Curves.linear,
     );
 
     _loadAiDefaults();
@@ -82,6 +171,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _liquidAnimationController.dispose();
+    _heroIconController.dispose();
     _pageController.dispose();
     _apiKeyController.dispose();
     _baseUrlController.dispose();
@@ -169,7 +259,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ),
               const SizedBox(height: 12),
               Text(
-                'Android Security Note:\nIf Android displays "Restricted setting", open App Info first, tap the top-right menu, select "Allow restricted settings", then enable PrivateAgent Screen Control.',
+                'Android Security Note:\nIf Android displays "Restricted setting", open App Info first, tap the top-right menu, select "Allow restricted settings", then enable Ultron 3 Screen Control.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
@@ -332,7 +422,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   Icon(Icons.check_circle_rounded, color: Colors.white),
                   SizedBox(width: 12),
                   Text(
-                    'Configuration Verified! Launching PrivateAgent...',
+                    'Configuration Verified! Launching Ultron 3...',
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ],
@@ -585,12 +675,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       body: Stack(
         children: [
           // Dynamic Soft Ambient Liquid Background
-          AnimatedBuilder(
-            animation: _liquidAnimation,
-            builder: (context, child) {
-              final value = _liquidAnimation.value;
-              return _buildLiquidBackgroundGlows(isDark, value);
-            },
+          RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _liquidAnimation,
+              builder: (context, child) {
+                final value = _liquidAnimation.value;
+                return _buildLiquidBackgroundGlows(isDark, value);
+              },
+            ),
           ),
 
           // Master Backdrop Blur Layer for Glass Diffusion
@@ -722,18 +814,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF0088CC), Color(0xFF0055FF)],
+                        colors: [Color(0xFF8B5CF6), Color(0xFF06B6D4)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0088CC).withOpacity(0.35),
-                          blurRadius: 10,
+                          color: const Color(0xFF8B5CF6).withOpacity(0.35),
+                          blurRadius: 12,
                           offset: const Offset(0, 3),
                         ),
                       ],
                     ),
                     child: const Icon(
-                      Icons.bubble_chart_rounded,
+                      Icons.auto_awesome,
                       color: Colors.white,
                       size: 18,
                     ),
@@ -743,11 +837,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'PRIVATE AGENT',
+                        'ULTRON 3',
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 13,
                           fontWeight: FontWeight.w900,
-                          letterSpacing: 1.1,
+                          letterSpacing: 1.5,
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                       ),
@@ -908,110 +1002,57 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
       child: Column(
         children: [
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
 
-          // --- Hero Icon Orb with animated orbiting ring ---
+          // --- Gemini-Style Sparkle Icon ---
           Center(
-            child: SizedBox(
-              width: 170,
-              height: 170,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Outer pulsing glow
-                  AnimatedBuilder(
-                    animation: _liquidAnimation,
-                    builder: (context, child) {
-                      final pulse = 0.85 + _liquidAnimation.value * 0.15;
-                      return Transform.scale(
-                        scale: pulse,
-                        child: Container(
-                          width: 170,
-                          height: 170,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                const Color(0xFF6366F1).withOpacity(isDark ? 0.18 : 0.12),
-                                const Color(0xFF0EA5E9).withOpacity(isDark ? 0.06 : 0.04),
-                                Colors.transparent,
-                              ],
-                              stops: const [0.0, 0.6, 1.0],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  // Orbiting ring
-                  AnimatedBuilder(
-                    animation: _liquidAnimation,
-                    builder: (context, child) {
-                      return Transform.rotate(
-                        angle: _liquidAnimation.value * math.pi * 2,
-                        child: Container(
-                          width: 140,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: isDark
-                                  ? const Color(0xFF818CF8).withOpacity(0.3)
-                                  : const Color(0xFF6366F1).withOpacity(0.18),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Align(
-                            alignment: Alignment.topCenter,
-                            child: Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF38BDF8), Color(0xFF818CF8)],
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF38BDF8).withOpacity(0.6),
-                                    blurRadius: 8,
-                                    spreadRadius: 1,
-                                  ),
+            child: RepaintBoundary(
+              child: SizedBox(
+                width: 160,
+                height: 160,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Soft ambient glow behind the icon
+                    AnimatedBuilder(
+                      animation: _liquidAnimation,
+                      builder: (context, child) {
+                        final pulse = 0.92 + _liquidAnimation.value * 0.08;
+                        return Transform.scale(
+                          scale: pulse,
+                          child: Container(
+                            width: 160,
+                            height: 160,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [
+                                  const Color(0xFF8B5CF6).withOpacity(isDark ? 0.20 : 0.14),
+                                  const Color(0xFF06B6D4).withOpacity(isDark ? 0.08 : 0.05),
+                                  Colors.transparent,
                                 ],
+                                stops: const [0.0, 0.55, 1.0],
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                  // Core icon
-                  Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF6366F1).withOpacity(isDark ? 0.45 : 0.30),
-                          blurRadius: 28,
-                          spreadRadius: 2,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                    child: const Icon(
-                      Icons.psychology_rounded,
-                      size: 42,
-                      color: Colors.white,
+                    // Gemini sparkle painted icon
+                    AnimatedBuilder(
+                      animation: _heroIconAnimation,
+                      builder: (context, child) {
+                        return CustomPaint(
+                          size: const Size(100, 100),
+                          painter: GeminiSparkleIconPainter(
+                            animationValue: _heroIconAnimation.value,
+                            isDark: isDark,
+                          ),
+                        );
+                      },
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1042,19 +1083,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               children: [
                 ShaderMask(
                   shaderCallback: (bounds) => const LinearGradient(
-                    colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
+                    colors: [Color(0xFF8B5CF6), Color(0xFF06B6D4)],
                   ).createShader(bounds),
-                  child: const Text(
-                    '\u2726',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.white,
-                    ),
+                  child: const Icon(
+                    Icons.auto_awesome,
+                    size: 14,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'PRIVATE LOCAL AI ASSISTANT',
+                  'INTELLIGENT AI ASSISTANT',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -1156,14 +1195,29 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           const SizedBox(height: 14),
 
           // --- Version badge ---
-          Text(
-            'v1.0 \u2022 Built for Android',
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w500,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
               color: isDark
-                  ? const Color(0xFF475569)
-                  : const Color(0xFFCBD5E1),
+                  ? Colors.white.withOpacity(0.06)
+                  : Colors.black.withOpacity(0.04),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withOpacity(0.08)
+                    : Colors.black.withOpacity(0.06),
+              ),
+            ),
+            child: Text(
+              'v1.0 \u2022 Built for Android',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+                color: isDark
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF64748B),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -1266,74 +1320,122 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   // --- STEP 2: PERMISSIONS ---
   Widget _buildPermissionsPage(bool isDark) {
+    final requiredCount = FeatureFlags.floatingOverlayEnabled ? 3 : 2;
+    final requiredGranted = [_isAccessibilityGranted, _isMicrophoneGranted, if (FeatureFlags.floatingOverlayEnabled) _isOverlayGranted].where((v) => v).length;
+    final optionalGranted = [_isNotificationsGranted, _isContactsGranted, _isPhoneGranted, _isSmsGranted].where((v) => v).length;
+
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           child: LiquidGlassContainer(
             borderRadius: 18,
-            padding: const EdgeInsets.all(14),
-            child: Row(
+            padding: const EdgeInsets.all(16),
+            child: Column(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF10B981).withOpacity(0.15),
-                  ),
-                  child: const Icon(
-                    Icons.verified_user_rounded,
-                    color: Color(0xFF10B981),
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Permissions & Access',
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF10B981).withOpacity(0.20),
+                            const Color(0xFF059669).withOpacity(0.08),
+                          ],
                         ),
                       ),
-                      Text(
-                        '$_grantedCount of $_totalCount Active',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: isDark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B),
-                        ),
+                      child: Icon(
+                        _canProceedToModel ? Icons.verified_rounded : Icons.verified_user_rounded,
+                        color: const Color(0xFF10B981),
+                        size: 22,
                       ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    color: _canProceedToModel
-                        ? const Color(0xFF10B981).withOpacity(0.12)
-                        : Colors.amber.withOpacity(0.12),
-                    border: Border.all(
-                      color: _canProceedToModel
-                          ? const Color(0xFF10B981)
-                          : Colors.amber,
                     ),
-                  ),
-                  child: Text(
-                    _canProceedToModel ? 'READY' : 'ACTION NEEDED',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: _canProceedToModel
-                          ? const Color(0xFF10B981)
-                          : Colors.amber[800],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Permissions & Access',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$_grantedCount of $_totalCount Active',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        gradient: _canProceedToModel
+                            ? LinearGradient(
+                                colors: [
+                                  const Color(0xFF10B981).withOpacity(0.15),
+                                  const Color(0xFF059669).withOpacity(0.08),
+                                ],
+                              )
+                            : LinearGradient(
+                                colors: [
+                                  Colors.amber.withOpacity(0.15),
+                                  Colors.orange.withOpacity(0.08),
+                                ],
+                              ),
+                        border: Border.all(
+                          color: _canProceedToModel
+                              ? const Color(0xFF10B981).withOpacity(0.5)
+                              : Colors.amber.withOpacity(0.5),
+                        ),
+                      ),
+                      child: Text(
+                        _canProceedToModel ? 'READY' : 'ACTION NEEDED',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: _canProceedToModel
+                              ? const Color(0xFF10B981)
+                              : Colors.amber[800],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Progress bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeOutCubic,
+                    height: 4,
+                    child: LinearProgressIndicator(
+                      value: _grantedCount / _totalCount,
+                      backgroundColor: isDark
+                          ? Colors.white.withOpacity(0.08)
+                          : Colors.black.withOpacity(0.05),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        _canProceedToModel
+                            ? const Color(0xFF10B981)
+                            : const Color(0xFF3B82F6),
+                      ),
+                      minHeight: 4,
                     ),
                   ),
                 ),
@@ -1344,7 +1446,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
         Expanded(
           child: ListView(
-            physics: const BouncingScrollPhysics(),
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             padding: const EdgeInsets.symmetric(horizontal: 20),
             children: [
               _buildCategoryHeader('Core Permissions (Required)', isDark),
@@ -1483,14 +1585,34 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   Widget _buildCategoryHeader(String title, bool isDark) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-        ),
+      padding: const EdgeInsets.only(left: 4, bottom: 10, top: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 14,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(2),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: title.contains('Required')
+                    ? [const Color(0xFF6366F1), const Color(0xFF3B82F6)]
+                    : [const Color(0xFF94A3B8), const Color(0xFF64748B)],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1504,141 +1626,167 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     required VoidCallback onGrant,
     required bool isDark,
   }) {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
       margin: const EdgeInsets.only(bottom: 10),
       child: LiquidGlassContainer(
         borderRadius: 18,
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         borderColor: isGranted
-            ? const Color(0xFF10B981).withOpacity(0.3)
+            ? const Color(0xFF10B981).withOpacity(0.35)
             : (isRequired
                 ? const Color(0xFF6366F1).withOpacity(0.2)
-                : Colors.transparent),
-        child: Row(
+                : null),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isGranted
-                    ? const Color(0xFF10B981).withOpacity(0.12)
-                    : const Color(0xFF6366F1).withOpacity(0.10),
-              ),
-              child: Icon(
-                icon,
-                size: 20,
-                color: isGranted
-                    ? const Color(0xFF10B981)
-                    : const Color(0xFF6366F1),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            Row(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    gradient: LinearGradient(
+                      colors: isGranted
+                          ? [
+                              const Color(0xFF10B981).withOpacity(0.15),
+                              const Color(0xFF059669).withOpacity(0.06),
+                            ]
+                          : [
+                              const Color(0xFF6366F1).withOpacity(0.12),
+                              const Color(0xFF3B82F6).withOpacity(0.05),
+                            ],
+                    ),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 20,
+                    color: isGranted
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF6366F1),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          title,
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.35,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isRequired && !isGranted)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: const Color(0xFF6366F1).withOpacity(0.12),
+                      border: Border.all(
+                        color: const Color(0xFF6366F1).withOpacity(0.2),
+                      ),
+                    ),
+                    child: const Text(
+                      'REQUIRED',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: Color(0xFF6366F1),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: isGranted
+                    ? Container(
+                        key: const ValueKey('granted'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFF10B981).withOpacity(0.12),
+                              const Color(0xFF059669).withOpacity(0.06),
+                            ],
+                          ),
+                          border: Border.all(
+                            color: const Color(0xFF10B981).withOpacity(0.25),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle_rounded,
+                              size: 14,
+                              color: Color(0xFF10B981),
+                            ),
+                            SizedBox(width: 5),
+                            Text(
+                              'Granted',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF10B981),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ElevatedButton(
+                        key: const ValueKey('enable'),
+                        onPressed: onGrant,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366F1),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Enable',
                           style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                      if (isRequired && !isGranted)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(6),
-                            color: Colors.indigo.withOpacity(0.15),
-                          ),
-                          child: const Text(
-                            'REQUIRED',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF6366F1),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      height: 1.4,
-                      color: isDark
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: isGranted
-                        ? Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              color: const Color(0xFF10B981).withOpacity(0.12),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.check_circle_rounded,
-                                  size: 13,
-                                  color: Color(0xFF10B981),
-                                ),
-                                SizedBox(width: 5),
-                                Text(
-                                  'Granted',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF10B981),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : ElevatedButton(
-                            onPressed: onGrant,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF6366F1),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 6,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            child: const Text(
-                              'Enable',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                  ),
-                ],
               ),
             ),
           ],
@@ -1653,28 +1801,57 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       children: [
         Expanded(
           child: ListView(
-            physics: const BouncingScrollPhysics(),
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             children: [
-              Text(
-                'Choose AI Provider',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                ),
+              // Header with icon
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF8B5CF6).withOpacity(isDark ? 0.20 : 0.12),
+                          const Color(0xFF6366F1).withOpacity(isDark ? 0.08 : 0.05),
+                        ],
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 18,
+                      color: Color(0xFF8B5CF6),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Choose AI Provider',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Select a cloud AI or connect locally.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Select a cloud AI service or connect to a local server.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark
-                      ? const Color(0xFF94A3B8)
-                      : const Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
               // Provider Chips Horizontal Scroll
               SizedBox(
@@ -1904,14 +2081,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     return GestureDetector(
       onTap: () => _selectProvider(id),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
         width: 98,
-        margin: const EdgeInsets.only(right: 8),
+        margin: const EdgeInsets.only(right: 4),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           gradient: isSelected
               ? const LinearGradient(
-                  colors: [Color(0xFF0088CC), Color(0xFF0055FF)],
+                  colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 )
@@ -1919,9 +2097,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: const Color(0xFF0088CC).withOpacity(0.38),
-                    blurRadius: 14,
-                    spreadRadius: -1,
+                    color: const Color(0xFF8B5CF6).withOpacity(0.35),
+                    blurRadius: 16,
+                    spreadRadius: -2,
                     offset: const Offset(0, 5),
                   ),
                 ]
@@ -1931,11 +2109,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           borderRadius: 18,
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
           borderColor: isSelected
-              ? Colors.white.withOpacity(0.5)
-              : (isDark ? Colors.white.withOpacity(0.12) : Colors.white.withOpacity(0.8)),
+              ? Colors.white.withOpacity(0.45)
+              : (isDark ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.8)),
           gradient: isSelected
               ? const LinearGradient(
-                  colors: [Color(0xFF0088CC), Color(0xFF0055FF)],
+                  colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 )
@@ -1943,21 +2121,31 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 22,
-                color: isSelected
-                    ? Colors.white
-                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSelected
+                      ? Colors.white.withOpacity(0.15)
+                      : Colors.transparent,
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 label,
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 10.5,
                   fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                   color: isSelected
                       ? Colors.white
