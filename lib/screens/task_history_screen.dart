@@ -349,7 +349,6 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
                         ],
                       ),
           ),
-        ),
       );
     }
 

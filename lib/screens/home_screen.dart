@@ -539,18 +539,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return SafeArea(
       bottom: false,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.08)
                     : Colors.white.withValues(alpha: 0.75),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(22),
                 border: Border.all(
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.14)
@@ -585,10 +585,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        width: 22,
-                        height: 22,
+                        width: 24,
+                        height: 24,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(7),
                           boxShadow: [
                             BoxShadow(
                               color: const Color(0xFF6366F1).withValues(alpha: 0.25),
@@ -598,16 +598,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ],
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(7),
                           child: Image.asset(
                             'assets/app-logo.png',
-                            width: 22,
-                            height: 22,
+                            width: 24,
+                            height: 24,
                             fit: BoxFit.cover,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 7),
+                      const SizedBox(width: 8),
                       ShaderMask(
                         shaderCallback: (bounds) => const LinearGradient(
                           colors: [Color(0xFF6366F1), Color(0xFF0EA5E9), Color(0xFF38BDF8)],
@@ -617,7 +617,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         child: const Text(
                           'Ultron-3',
                           style: TextStyle(
-                            fontSize: 17,
+                            fontSize: 18,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.4,
                             color: Colors.white,
@@ -634,7 +634,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     isDark: isDark,
                     onPressed: _isLoading ? null : _startNewChat,
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 5),
                   // Settings Action
                   _buildHeaderIconButton(
                     icon: Icons.settings_rounded,
@@ -679,8 +679,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: Tooltip(
           message: tooltip,
           child: Container(
-            width: 34,
-            height: 34,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: isDark
                   ? Colors.white.withValues(alpha: 0.07)
@@ -689,7 +689,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             child: Icon(
               icon,
-              size: 18,
+              size: 19,
               color: isDark
                   ? (onPressed == null ? Colors.white30 : Colors.white)
                   : (onPressed == null ? Colors.black26 : const Color(0xFF1E293B)),
