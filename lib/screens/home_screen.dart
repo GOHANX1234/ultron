@@ -471,7 +471,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (generation != _overlayUpdateGeneration) return;
       if (_appLifecycleState == AppLifecycleState.paused) return;
       await FlutterOverlayWindow.closeOverlay();
-   @override
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
