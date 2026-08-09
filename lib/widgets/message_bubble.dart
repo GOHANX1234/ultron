@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/chat_message.dart';
@@ -11,102 +12,167 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isUser = message.isUser;
 
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.8,
-        ),
-        margin: EdgeInsets.only(
-          left: isUser ? 48 : 8,
-          right: isUser ? 8 : 48,
-          top: 4,
-          bottom: 4,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isUser
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(20),
-            topRight: const Radius.circular(20),
-            bottomLeft: Radius.circular(isUser ? 20 : 4),
-            bottomRight: Radius.circular(isUser ? 4 : 20),
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutQuart,
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(isUser ? (1 - value) * 20 : (value - 1) * 20, 0),
+          child: Opacity(
+            opacity: value,
+            child: child,
           ),
-          border: isUser
-              ? null
-              : Border.all(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
-                  width: 1.2,
-                ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.15 : 0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
+        );
+      },
+      child: Align(
+        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.sizeOf(context).width * 0.8,
+          ),
+          margin: EdgeInsets.only(
+            left: isUser ? 48 : 8,
+            right: isUser ? 8 : 48,
+            top: 4,
+            bottom: 4,
+          ),
+          child: isUser
+              ? _buildUserBubble(context)
+              : _buildAssistantBubble(context),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Action result badge
-            if (message.actionResult != null) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: message.actionResult!.success
-                      ? Colors.green.withValues(alpha: 0.12)
-                      : Colors.red.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: message.actionResult!.success
-                        ? Colors.green.withValues(alpha: 0.3)
-                        : Colors.red.withValues(alpha: 0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      message.actionResult!.success
-                          ? Icons.check_circle_rounded
-                          : Icons.error_rounded,
-                      size: 14,
-                      color: message.actionResult!.success
-                          ? Colors.green
-                          : Colors.red,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      message.actionResult!.actionType.toUpperCase().replaceAll('_', ' '),
-                      style: TextStyle(
-                        fontSize: 10,
+      ),
+    );
+  }
+
+  Widget _buildUserBubble(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.indigo.shade500,
+            Colors.blue.shade600,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+          bottomLeft: Radius.circular(20),
+          bottomRight: Radius.circular(4),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withValues(alpha: 0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          SelectableText(
+            message.content,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _formatTime(message.timestamp),
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssistantBubble(BuildContext context) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(20),
+        topRight: Radius.circular(20),
+        bottomLeft: Radius.circular(4),
+        bottomRight: Radius.circular(20),
+      ),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.4),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+              bottomLeft: Radius.circular(4),
+              bottomRight: Radius.circular(20),
+            ),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (message.actionResult != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
                         color: message.actionResult!.success
-                            ? Colors.green
-                            : Colors.red,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
+                            ? Colors.green.withValues(alpha: 0.15)
+                            : Colors.red.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: message.actionResult!.success
+                              ? Colors.green.withValues(alpha: 0.4)
+                              : Colors.red.withValues(alpha: 0.4),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            message.actionResult!.success
+                                ? Icons.check_circle_rounded
+                                : Icons.error_rounded,
+                            size: 14,
+                            color: message.actionResult!.success
+                                ? Colors.green
+                                : Colors.red,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            message.actionResult!.actionType.toUpperCase().replaceAll('_', ' '),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: message.actionResult!.success
+                                  ? Colors.green
+                                  : Colors.red,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
-            // Message text
-            if (isUser)
-              SelectableText(
-                message.content,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  fontSize: 15,
-                  height: 1.4,
-                ),
-              )
-            else
+              ],
               MarkdownBody(
                 data: message.content,
                 selectable: true,
@@ -122,24 +188,16 @@ class MessageBubble extends StatelessWidget {
                   ),
                 ),
               ),
-            // Timestamp
-            const SizedBox(height: 4),
-            Text(
-              _formatTime(message.timestamp),
-              style: TextStyle(
-                fontSize: 11,
-                color: isUser
-                    ? Theme.of(context)
-                        .colorScheme
-                        .onPrimary
-                        .withValues(alpha: 0.6)
-                    : Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.5),
+              const SizedBox(height: 4),
+              Text(
+                _formatTime(message.timestamp),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

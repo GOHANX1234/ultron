@@ -471,54 +471,425 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (generation != _overlayUpdateGeneration) return;
       if (_appLifecycleState == AppLifecycleState.paused) return;
       await FlutterOverlayWindow.closeOverlay();
-    }
-  }
-
-  @override
+   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF0C0A15)
-          : const Color(0xFFFFFFFF),
-      appBar: AppBar(
-        title: RichText(
-          text: TextSpan(
-            style: TextStyle(
-              fontSize: 20,
-              color: isDark ? Colors.white : const Color(0xFF1E293B),
+      extendBody: true,
+      extendBodyBehindAppBar: true,
+      backgroundColor: isDark ? const Color(0xFF090D16) : const Color(0xFFF8FAFC),
+      drawer: _buildDrawer(context, isDark),
+      body: Stack(
+        children: [
+          // Dynamic liquid background glows
+          _buildBackgroundGlows(isDark),
+
+          // Master Backdrop blur filter for atmospheric glass diffusion
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+              child: Container(color: Colors.transparent),
             ),
+          ),
+
+          // Main Column layout
+          Column(
             children: [
-              TextSpan(
-                text: 'Ultron-3',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  color: Theme.of(context).colorScheme.primary,
-                  letterSpacing: -0.5,
-                ),
+              // Floating Glass Header (Replaces heavy standard AppBar)
+              _buildFloatingHeader(context, isDark),
+
+              // Mode Pill Selector (Chat / Agent)
+              _buildModeSelector(isDark),
+
+              // API key warning banner if not configured
+              if (!_aiService.isConfigured) _buildApiWarningBanner(context, isDark),
+
+              // Chat Messages or Empty State
+              Expanded(
+                child: _messages.isEmpty
+                    ? _buildEmptyState(isDark)
+                    : ListView.builder(
+                        controller: _scrollController,
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) {
+                          return MessageBubble(message: _messages[index]);
+                        },
+                      ),
               ),
+
+              // Shimmer / Dot pulse thinking loading indicator
+              if (_isLoading) _buildThinkingIndicator(isDark),
+
+              // Frosted Liquid Glass Input Bar
+              _buildInputBar(isDark),
             ],
           ),
-        ),
-        backgroundColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu_rounded),
-            tooltip: 'Menu',
-            onPressed: () => Scaffold.of(context).openDrawer(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingHeader(BuildContext context, bool isDark) {
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.07)
+                    : Colors.white.withValues(alpha: 0.70),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.14)
+                      : Colors.white.withValues(alpha: 0.80),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isDark
+                        ? Colors.black.withValues(alpha: 0.3)
+                        : const Color(0x0F0F172A),
+                    blurRadius: 20,
+                    spreadRadius: -2,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  // Menu drawer trigger button
+                  Builder(
+                    builder: (btnContext) => Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => Scaffold.of(btnContext).openDrawer(),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : Colors.black.withValues(alpha: 0.04),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.menu_rounded,
+                            size: 20,
+                            color: isDark ? Colors.white : const Color(0xFF1E293B),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  // Brand Title with Gradient
+                  ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFF0EA5E9), Color(0xFF38BDF8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ).createShader(bounds),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFF6366F1).withValues(alpha: 0.8),
+                                const Color(0xFF0EA5E9).withValues(alpha: 0.8),
+                              ],
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.smart_toy_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Ultron-3',
+                          style: TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  // New Chat Action
+                  IconButton(
+                    icon: Icon(
+                      Icons.add_comment_outlined,
+                      size: 20,
+                      color: isDark ? Colors.white : const Color(0xFF1E293B),
+                    ),
+                    tooltip: 'New Chat',
+                    onPressed: _isLoading ? null : _startNewChat,
+                  ),
+                  // Settings Action
+                  IconButton(
+                    icon: Icon(
+                      Icons.settings_rounded,
+                      size: 20,
+                      color: isDark ? Colors.white : const Color(0xFF1E293B),
+                    ),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SettingsScreen(
+                            aiService: _aiService,
+                            shizukuService: _actionHandler.shizuku,
+                            screenAutomationService: _actionHandler.screenAutomation,
+                            telegramService: _telegramService,
+                          ),
+                        ),
+                      );
+                      await _actionHandler.shizuku.checkAvailability();
+                      if (mounted) setState(() {});
+                    },
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_comment_outlined),
-            tooltip: 'New chat',
-            onPressed: _isLoading ? null : _startNewChat,
+      ),
+    );
+  }
+
+  Widget _buildBackgroundGlows(bool isDark) {
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          // Top-left indigo glow orb
+          Positioned(
+            top: -120,
+            left: -60,
+            child: Container(
+              width: 380,
+              height: 380,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    isDark
+                        ? const Color(0xFF6366F1).withValues(alpha: 0.30)
+                        : const Color(0xFF4F46E5).withValues(alpha: 0.16),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
           ),
-          // Settings Action
-          IconButton(
-            icon: const Icon(Icons.settings_rounded),
+          // Bottom-right sky blue orb
+          Positioned(
+            bottom: 30,
+            right: -80,
+            child: Container(
+              width: 360,
+              height: 360,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    isDark
+                        ? const Color(0xFF38BDF8).withValues(alpha: 0.22)
+                        : const Color(0xFF0EA5E9).withValues(alpha: 0.12),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Center purple ambient accent orb
+          Positioned(
+            top: 280,
+            right: 40,
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    isDark
+                        ? const Color(0xFF8B5CF6).withValues(alpha: 0.18)
+                        : const Color(0xFFA855F7).withValues(alpha: 0.10),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeSelector(bool isDark) {
+    final isChat = _mode == 'chat';
+
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.only(top: 8, bottom: 12),
+        padding: const EdgeInsets.all(4),
+        width: 220,
+        height: 44,
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.12)
+                : Colors.black.withValues(alpha: 0.08),
+            width: 1,
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Animated Liquid Glass pill slider
+            AnimatedAlign(
+              alignment: isChat ? Alignment.centerLeft : Alignment.centerRight,
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeInOutCubic,
+              child: FractionallySizedBox(
+                widthFactor: 0.5,
+                child: Container(
+                  height: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(26),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.40),
+                        blurRadius: 12,
+                        spreadRadius: -1,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _mode = 'chat'),
+                    behavior: HitTestBehavior.opaque,
+                    child: Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 15,
+                            color: isChat
+                                ? Colors.white
+                                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Chat',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isChat
+                                  ? Colors.white
+                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _mode = 'agent'),
+                    behavior: HitTestBehavior.opaque,
+                    child: Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.smart_toy_outlined,
+                            size: 15,
+                            color: !isChat
+                                ? Colors.white
+                                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Agent',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: !isChat
+                                  ? Colors.white
+                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildApiWarningBanner(BuildContext context, bool isDark) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: isDark ? 0.15 : 0.12),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.amber.withValues(alpha: 0.35),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 20),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'API not configured. Tap Settings to set up.',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+            ),
+          ),
+          TextButton(
             onPressed: () async {
               await Navigator.push(
                 context,
@@ -531,592 +902,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
               );
-              await _actionHandler.shizuku.checkAvailability();
               if (mounted) setState(() {});
             },
-          ),
-        ],
-      ),
-      drawer: _buildDrawer(context, isDark),
-      body: Stack(
-        children: [
-          // Background mesh glows
-          _buildBackgroundGlows(isDark),
-
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 100, sigmaY: 100),
-              child: Container(color: Colors.transparent),
-            ),
-          ),
-
-          Column(
-            children: [
-              // Pill selector switcher
-              _buildModeSelector(isDark),
-
-              // API key warning banner
-              if (!_aiService.isConfigured)
-                Container(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.orangeAccent.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.orangeAccent.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.warning_amber_rounded,
-                        color: Colors.orange,
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'API not configured. Tap Settings to add details.',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => SettingsScreen(
-                                aiService: _aiService,
-                                shizukuService: _actionHandler.shizuku,
-                                screenAutomationService:
-                                    _actionHandler.screenAutomation,
-                                telegramService: _telegramService,
-                              ),
-                            ),
-                          );
-                          if (mounted) setState(() {});
-                        },
-                        child: const Text('Configure'),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Chat content area
-              Expanded(
-                child: _messages.isEmpty
-                    ? _buildEmptyState(isDark)
-                    : ListView.builder(
-                        controller: _scrollController,
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) {
-                          return MessageBubble(message: _messages[index]);
-                        },
-                      ),
-              ),
-
-              // Think loading indicator
-              if (_isLoading)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.indigoAccent,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Thinking...',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark
-                              ? const Color(0xFF9E9BAC)
-                              : const Color(0xFF6C6A7C),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton.icon(
-                        onPressed: () {
-                          _actionHandler.cancelTask();
-                          setState(() {
-                            _isLoading = false;
-                          });
-                        },
-                        icon: const Icon(
-                          Icons.stop_circle_rounded,
-                          size: 16,
-                          color: Colors.redAccent,
-                        ),
-                        label: const Text(
-                          'Stop',
-                          style: TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Custom Input bar
-              _buildInputBar(isDark),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDrawer(BuildContext context, bool isDark) {
-    final drawerBg = isDark ? const Color(0xFF0B0F19) : const Color(0xFFF8FAFC);
-    final textStyle = TextStyle(
-      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-      fontWeight: FontWeight.w600,
-      fontSize: 13.5,
-    );
-    final headerStyle = TextStyle(
-      color: isDark ? Colors.white : const Color(0xFF1E293B),
-      fontSize: 17,
-      fontWeight: FontWeight.w900,
-      letterSpacing: -0.5,
-    );
-
-    return Drawer(
-      backgroundColor: drawerBg,
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Drawer Header
-            Container(
-              padding: const EdgeInsets.only(
-                top: 16,
-                bottom: 16,
-                left: 20,
-                right: 12,
-              ),
-              alignment: Alignment.centerLeft,
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.smart_toy_rounded,
-                    color: Theme.of(context).primaryColor,
-                    size: 26,
-                  ),
-                  const SizedBox(width: 12),
-                  Text('Ultron-3', style: headerStyle),
-                  const Spacer(),
-                  IconButton(
-                    icon: Icon(
-                      Icons.close_rounded,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                      size: 20,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-
-          // New Chat Button
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withOpacity(0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    Navigator.pop(context); // Close drawer
-                    _startNewChat();
-                  },
-                  borderRadius: BorderRadius.circular(16),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.add_comment_rounded,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'New Chat',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          const Divider(indent: 16, endIndent: 16, height: 20),
-
-          // Section CHAT HISTORY
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'CHAT HISTORY',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: Theme.of(context).primaryColor,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
-          ),
-
-          // Chat Sessions List
-          Expanded(
-            child: FutureBuilder<List<ChatSession>>(
-              future: ChatHistoryService.loadSessions(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No recent chats',
-                      style: TextStyle(
-                        color: isDark ? Colors.grey[800] : Colors.grey[400],
-                        fontSize: 12,
-                      ),
-                    ),
-                  );
-                }
-
-                final sessions = snapshot.data!;
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  itemCount: sessions.length,
-                  itemBuilder: (context, index) {
-                    final session = sessions[index];
-                    final isCurrent = session.id == _sessionId;
-
-                    return Container(
-                      margin: const EdgeInsets.symmetric(
-                        vertical: 2,
-                        horizontal: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isCurrent
-                            ? Theme.of(
-                                context,
-                              ).colorScheme.primary.withOpacity(0.08)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                        border: isCurrent
-                            ? Border.all(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primary.withOpacity(0.15),
-                              )
-                            : null,
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 0,
-                        ),
-                        dense: true,
-                        leading: Icon(
-                          Icons.chat_bubble_outline_rounded,
-                          size: 15,
-                          color: isCurrent
-                              ? Theme.of(context).colorScheme.primary
-                              : (isDark ? Colors.grey[600] : Colors.grey[500]),
-                        ),
-                        title: Text(
-                          session.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textStyle.copyWith(
-                            fontWeight: isCurrent
-                                ? FontWeight.bold
-                                : FontWeight.w500,
-                            color: isCurrent
-                                ? (isDark
-                                      ? Colors.white
-                                      : const Color(0xFF1E293B))
-                                : null,
-                          ),
-                        ),
-                        trailing: IconButton(
-                          icon: Icon(
-                            Icons.delete_outline_rounded,
-                            size: 16,
-                            color: Colors.redAccent.withOpacity(0.7),
-                          ),
-                          onPressed: () async {
-                            await ChatHistoryService.deleteSession(session.id);
-                            if (isCurrent) {
-                              _startNewChat();
-                            }
-                            (context as Element)
-                                .markNeedsBuild(); // Re-trigger build refresh
-                          },
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _loadChatSession(session);
-                        },
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-
-          const Divider(indent: 16, endIndent: 16, height: 20),
-
-          // Section TASKS & SETTINGS
-          ListTile(
-            horizontalTitleGap: 8,
-            leading: Icon(
-              Icons.history_rounded,
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
-              size: 20,
-            ),
-            title: Text('Task History', style: textStyle),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
-              );
-            },
-          ),
-          ListTile(
-            horizontalTitleGap: 8,
-            leading: Icon(
-              Icons.settings_rounded,
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
-              size: 20,
-            ),
-            title: Text('Settings', style: textStyle),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => SettingsScreen(
-                    aiService: _aiService,
-                    shizukuService: _actionHandler.shizuku,
-                    screenAutomationService: _actionHandler.screenAutomation,
-                    telegramService: _telegramService,
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    ),
-  );
-}
-
-  Widget _buildBackgroundGlows(bool isDark) {
-    return Positioned.fill(
-      child: Stack(
-        children: [
-          Positioned(
-            top: -150,
-            left: -50,
-            child: Container(
-              width: 400,
-              height: 400,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    isDark
-                        ? const Color(0xFF6366F1).withOpacity(0.24)
-                        : const Color(0xFF4F46E5).withOpacity(0.12),
-                    isDark
-                        ? const Color(0xFF6366F1).withOpacity(0)
-                        : const Color(0xFF4F46E5).withOpacity(0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 50,
-            right: -100,
-            child: Container(
-              width: 350,
-              height: 350,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    isDark
-                        ? const Color(0xFF38BDF8).withOpacity(0.18)
-                        : const Color(0xFF0EA5E9).withOpacity(0.09),
-                    isDark
-                        ? const Color(0xFF38BDF8).withOpacity(0)
-                        : const Color(0xFF0EA5E9).withOpacity(0),
-                  ],
-                ),
-              ),
+            child: const Text(
+              'Configure',
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildModeSelector(bool isDark) {
-    final activeBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
-
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 12),
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: activeBg,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.06),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildModeButton(
-              'chat',
-              'Chat',
-              Icons.chat_bubble_outline_rounded,
-              isDark,
-            ),
-            _buildModeButton(
-              'agent',
-              'Agent',
-              Icons.smart_toy_outlined,
-              isDark,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModeButton(
-    String modeId,
-    String label,
-    IconData icon,
-    bool isDark,
-  ) {
-    final isSelected = _mode == modeId;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _mode = modeId;
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(26),
-          color: isSelected
-              ? Theme.of(context).colorScheme.primary
-              : Colors.transparent,
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withOpacity(0.20),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 15,
-              color: isSelected
-                  ? Colors.white
-                  : (isDark
-                        ? const Color(0xFF94A3B8)
-                        : const Color(0xFF475569)),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected
-                    ? Colors.white
-                    : (isDark
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF475569)),
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1136,131 +929,255 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     final suggestions = _mode == 'chat'
         ? [
-            'Write a professional email',
-            'Explain quantum computing simply',
-            'Brainstorm mobile app ideas',
-            'Write a poem about robots',
+            {'icon': Icons.email_outlined, 'title': 'Write a professional email'},
+            {'icon': Icons.lightbulb_outline_rounded, 'title': 'Explain quantum computing'},
+            {'icon': Icons.rocket_launch_outlined, 'title': 'Brainstorm mobile app ideas'},
+            {'icon': Icons.draw_outlined, 'title': 'Write a poem about robots'},
           ]
         : [
-            'Open YouTube and search for cats',
-            'Call Mom',
-            'Set volume to 80%',
-            'What\'s on my screen?',
+            {'icon': Icons.play_circle_outline_rounded, 'title': 'Open YouTube & find videos'},
+            {'icon': Icons.call_outlined, 'title': 'Call Mom'},
+            {'icon': Icons.volume_up_outlined, 'title': 'Set volume to 80%'},
+            {'icon': Icons.screen_search_desktop_outlined, 'title': 'What\'s on my screen?'},
           ];
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-        child: Column(
-          children: [
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    timeGreeting,
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w300,
-                      color: isDark
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF64748B),
-                      letterSpacing: -1.5,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'How can I help you?',
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.primary,
-                      letterSpacing: -1.5,
-                      height: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 48),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'SUGGESTIONS',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: isDark
-                      ? const Color(0xFF94A3B8)
-                      : const Color(0xFF475569),
-                  letterSpacing: 1.5,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 16),
+          // Gemini/Ultron Sparkle Hero Icon
+          Center(
+            child: Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF6366F1).withValues(alpha: isDark ? 0.25 : 0.15),
+                    const Color(0xFF0EA5E9).withValues(alpha: isDark ? 0.15 : 0.08),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border.all(
+                  color: const Color(0xFF6366F1).withValues(alpha: isDark ? 0.35 : 0.2),
+                  width: 1.2,
                 ),
               ),
+              child: const Icon(
+                Icons.auto_awesome,
+                size: 38,
+                color: Color(0xFF6366F1),
+              ),
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 52,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: suggestions.length,
-                itemBuilder: (context, index) {
-                  final suggestion = suggestions[index];
-                  return Container(
-                    margin: const EdgeInsets.only(right: 12),
-                    child: InkWell(
-                      onTap: () => _sendMessage(suggestion),
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
+          ),
+          const SizedBox(height: 24),
+
+          // Greeting text
+          Text(
+            timeGreeting,
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w300,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              letterSpacing: -1.2,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          ShaderMask(
+            shaderCallback: (bounds) => const LinearGradient(
+              colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
+            ).createShader(bounds),
+            child: const Text(
+              'How can I help you?',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: -1.2,
+                height: 1.2,
+              ),
+            ),
+          ),
+          const SizedBox(height: 36),
+
+          // Suggestions Header
+          Text(
+            'SUGGESTIONS',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 2-Column Grid Layout of Glass Suggestion Cards
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.5,
+            ),
+            itemCount: suggestions.length,
+            itemBuilder: (context, index) {
+              final item = suggestions[index];
+              final title = item['title'] as String;
+              final icon = item['icon'] as IconData;
+
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.05)
+                          : Colors.white.withValues(alpha: 0.70),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.12)
+                            : Colors.white.withValues(alpha: 0.80),
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
                           color: isDark
-                              ? const Color(0xFF151D30)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isDark
-                                ? const Color(0xFF243049).withOpacity(0.4)
-                                : const Color(0xFFE2E8F0),
-                            width: 1.2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(
-                                isDark ? 0.1 : 0.02,
-                              ),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
+                              ? Colors.black.withValues(alpha: 0.20)
+                              : const Color(0x0A0F172A),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
                         ),
-                        child: Center(
-                          child: Text(
-                            suggestion,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? const Color(0xFFF8FAFC)
-                                  : const Color(0xFF1E293B),
-                            ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _sendMessage(title),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFF6366F1).withValues(alpha: isDark ? 0.2 : 0.1),
+                                ),
+                                child: Icon(
+                                  icon,
+                                  size: 18,
+                                  color: const Color(0xFF6366F1),
+                                ),
+                              ),
+                              Text(
+                                title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                  );
-                },
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThinkingIndicator(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : Colors.black.withValues(alpha: 0.06),
               ),
             ),
-          ],
-        ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Thinking...',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          TextButton.icon(
+            onPressed: () {
+              _actionHandler.cancelTask();
+              setState(() {
+                _isLoading = false;
+              });
+            },
+            icon: const Icon(
+              Icons.stop_circle_rounded,
+              size: 16,
+              color: Colors.redAccent,
+            ),
+            label: const Text(
+              'Stop',
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1269,122 +1186,406 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        decoration: const BoxDecoration(color: Colors.transparent),
-        child: Row(
-          children: [
-            // Glowing Voice Mic button
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _isListening
-                    ? Colors.redAccent
-                    : Theme.of(context).cardTheme.color,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.white.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(28),
                 border: Border.all(
-                  color: _isListening
-                      ? Colors.redAccent
-                      : Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.16)
+                      : Colors.white.withValues(alpha: 0.85),
                   width: 1.2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+                    color: isDark
+                        ? Colors.black.withValues(alpha: 0.30)
+                        : const Color(0x140F172A),
+                    blurRadius: 24,
+                    spreadRadius: -2,
+                    offset: const Offset(0, 8),
                   ),
-                  if (_isListening)
-                    BoxShadow(
-                      color: Colors.redAccent.withOpacity(0.4),
-                      blurRadius: 12,
-                      spreadRadius: 2,
-                    ),
                 ],
               ),
-              child: IconButton(
-                icon: Icon(
-                  _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                  color: _isListening
-                      ? Colors.white
-                      : Theme.of(context).colorScheme.primary,
-                ),
-                onPressed: _isLoading ? null : _toggleVoice,
+              child: Row(
+                children: [
+                  // Voice Mic Button with pulse effect when listening
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _isListening
+                          ? Colors.redAccent
+                          : (isDark
+                                ? Colors.white.withValues(alpha: 0.1)
+                                : Colors.black.withValues(alpha: 0.05)),
+                      border: Border.all(
+                        color: _isListening
+                            ? Colors.redAccent
+                            : (isDark
+                                  ? Colors.white.withValues(alpha: 0.2)
+                                  : Colors.black.withValues(alpha: 0.1)),
+                        width: 1.2,
+                      ),
+                      boxShadow: _isListening
+                          ? [
+                              BoxShadow(
+                                color: Colors.redAccent.withValues(alpha: 0.5),
+                                blurRadius: 14,
+                                spreadRadius: 2,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                        color: _isListening
+                            ? Colors.white
+                            : (isDark ? Colors.white : const Color(0xFF4F46E5)),
+                        size: 20,
+                      ),
+                      onPressed: _isLoading ? null : _toggleVoice,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Command text input field
+                  Expanded(
+                    child: TextField(
+                      controller: _textController,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                      ),
+                      decoration: InputDecoration(
+                        hintText: _isListening ? 'Listening...' : 'Type a command...',
+                        hintStyle: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: InputBorder.none,
+                      ),
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: _isLoading ? null : (text) => _sendMessage(text),
+                    ),
+                  ),
+
+                  // Send Action Button with Gradient
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.45),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.send_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                      onPressed: _isLoading ? null : () => _sendMessage(_textController.text),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 10),
+          ),
+        ),
+      ),
+    );
+  }
 
-            // Custom Text input container
-            Expanded(
+  Widget _buildDrawer(BuildContext context, bool isDark) {
+    final drawerBg = isDark ? const Color(0xFF090D16) : const Color(0xFFF8FAFC);
+
+    return Drawer(
+      backgroundColor: drawerBg,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Drawer Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.smart_toy_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Ultron-3',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF1E293B),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                      size: 20,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+
+            // New Chat Liquid Glass Button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               child: Container(
+                width: double.infinity,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).cardTheme.color,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withOpacity(0.08),
-                    width: 1.2,
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-                      blurRadius: 8,
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                      blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _textController,
-                        style: const TextStyle(fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: _isListening
-                              ? 'Listening...'
-                              : 'Type a command...',
-                          hintStyle: TextStyle(
-                            fontSize: 13,
-                            color: isDark ? Colors.grey[600] : Colors.grey[400],
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.pop(context);
+                      _startNewChat();
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_comment_rounded, color: Colors.white, size: 16),
+                          SizedBox(width: 8),
+                          Text(
+                            'New Chat',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                          border: InputBorder.none,
-                        ),
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: _isLoading
-                            ? null
-                            : (text) => _sendMessage(text),
+                        ],
                       ),
                     ),
-
-                    // Solid Send button
-                    Container(
-                      margin: const EdgeInsets.only(right: 6),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.send_rounded,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                        onPressed: _isLoading
-                            ? null
-                            : () => _sendMessage(_textController.text),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
+
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Divider(height: 1),
+            ),
+
+            // Section Label: CHAT HISTORY
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'CHAT HISTORY',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(context).primaryColor,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+            ),
+
+            // Chat Sessions List
+            Expanded(
+              child: FutureBuilder<List<ChatSession>>(
+                future: ChatHistoryService.loadSessions(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No recent chats',
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[700] : Colors.grey[400],
+                          fontSize: 12,
+                        ),
+                      ),
+                    );
+                  }
+
+                  final sessions = snapshot.data!;
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    itemCount: sessions.length,
+                    itemBuilder: (context, index) {
+                      final session = sessions[index];
+                      final isCurrent = session.id == _sessionId;
+
+                      return Container(
+                        margin: const EdgeInsets.symmetric(vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isCurrent
+                              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(14),
+                          border: isCurrent
+                              ? Border.all(
+                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
+                                )
+                              : null,
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                          dense: true,
+                          leading: Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 16,
+                            color: isCurrent
+                                ? Theme.of(context).colorScheme.primary
+                                : (isDark ? Colors.grey[500] : Colors.grey[600]),
+                          ),
+                          title: Text(
+                            session.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                              color: isCurrent
+                                  ? (isDark ? Colors.white : const Color(0xFF1E293B))
+                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                            ),
+                          ),
+                          trailing: IconButton(
+                            icon: Icon(
+                              Icons.delete_outline_rounded,
+                              size: 16,
+                              color: Colors.redAccent.withValues(alpha: 0.7),
+                            ),
+                            onPressed: () async {
+                              await ChatHistoryService.deleteSession(session.id);
+                              if (isCurrent) {
+                                _startNewChat();
+                              }
+                              if (mounted) setState(() {});
+                            },
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _loadChatSession(session);
+                          },
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Divider(height: 1),
+            ),
+
+            // Navigation Options
+            ListTile(
+              horizontalTitleGap: 8,
+              leading: Icon(
+                Icons.history_rounded,
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                size: 20,
+              ),
+              title: Text(
+                'Task History',
+                style: TextStyle(
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13.5,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
+                );
+              },
+            ),
+            ListTile(
+              horizontalTitleGap: 8,
+              leading: Icon(
+                Icons.settings_rounded,
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                size: 20,
+              ),
+              title: Text(
+                'Settings',
+                style: TextStyle(
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13.5,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SettingsScreen(
+                      aiService: _aiService,
+                      shizukuService: _actionHandler.shizuku,
+                      screenAutomationService: _actionHandler.screenAutomation,
+                      telegramService: _telegramService,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
           ],
         ),
       ),
     );
   }
 }
+
