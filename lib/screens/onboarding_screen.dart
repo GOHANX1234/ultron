@@ -668,60 +668,73 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF090D16)
-          : const Color(0xFFF8FAFC),
-      body: Stack(
-        children: [
-          // Dynamic Soft Ambient Liquid Background
-          RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: _liquidAnimation,
-              builder: (context, child) {
-                final value = _liquidAnimation.value;
-                return _buildLiquidBackgroundGlows(isDark, value);
-              },
+    final overlayStyle = SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarContrastEnforced: false,
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: Scaffold(
+        backgroundColor: isDark
+            ? const Color(0xFF090D16)
+            : const Color(0xFFF8FAFC),
+        body: Stack(
+          children: [
+            // Dynamic Soft Ambient Liquid Background
+            RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: _liquidAnimation,
+                builder: (context, child) {
+                  final value = _liquidAnimation.value;
+                  return _buildLiquidBackgroundGlows(isDark, value);
+                },
+              ),
             ),
-          ),
 
-          // Master Backdrop Blur Layer for Glass Diffusion
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-              child: Container(color: Colors.transparent),
+            // Master Backdrop Blur Layer for Glass Diffusion
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
+                child: Container(color: Colors.transparent),
+              ),
             ),
-          ),
 
-          SafeArea(
-            child: Column(
-              children: [
-                // Top Navigation & Step Indicator Header
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 6),
-                  child: _buildLiquidHeader(isDark),
-                ),
-
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(),
-                    onPageChanged: (page) {
-                      setState(() {
-                        _currentStep = page;
-                      });
-                    },
-                    children: [
-                      _buildWelcomePage(isDark),
-                      _buildPermissionsPage(isDark),
-                      _buildModelSetupPage(isDark),
-                    ],
+            SafeArea(
+              child: Column(
+                children: [
+                  // Top Navigation & Step Indicator Header
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 6),
+                    child: _buildLiquidHeader(isDark),
                   ),
-                ),
-              ],
+
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      onPageChanged: (page) {
+                        setState(() {
+                          _currentStep = page;
+                        });
+                      },
+                      children: [
+                        _buildWelcomePage(isDark),
+                        _buildPermissionsPage(isDark),
+                        _buildModelSetupPage(isDark),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

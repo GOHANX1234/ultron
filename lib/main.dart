@@ -43,6 +43,16 @@ void Function(String task)? onOverlayTask;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarContrastEnforced: false,
+    ),
+  );
+
   if (FeatureFlags.floatingOverlayEnabled) {
     FlutterOverlayWindow.overlayListener.listen((event) {
       log("Main app received from overlay: $event");
@@ -78,7 +88,20 @@ class Ultron3App extends StatelessWidget {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeNotifier,
       builder: (context, ThemeMode currentMode, child) {
-        return MaterialApp(
+        final isDark = currentMode == ThemeMode.dark;
+        final overlayStyle = SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarDividerColor: Colors.transparent,
+          systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          systemNavigationBarContrastEnforced: false,
+        );
+
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: overlayStyle,
+          child: MaterialApp(
           title: 'Ultron-3',
           debugShowCheckedModeBanner: false,
           themeMode: currentMode,
@@ -165,8 +188,9 @@ class Ultron3App extends StatelessWidget {
           home: onboardingCompleted
               ? const HomeScreen()
               : const OnboardingScreen(),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 }
