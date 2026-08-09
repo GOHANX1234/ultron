@@ -1194,10 +1194,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           const SizedBox(height: 16),
           if (!widget.shizukuService.isAvailable) ...[
             Text(
-              '1. Install Shizuku from Play Store
-'
-              '2. Open Shizuku and start it via Wireless Debugging
-'
+              '1. Install Shizuku from Play Store\n'
+              '2. Open Shizuku and start it via Wireless Debugging\n'
               '3. Come back here and tap "Check Again"',
               style: TextStyle(
                 fontSize: 13,
