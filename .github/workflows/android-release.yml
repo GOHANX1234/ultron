@@ -3,6 +3,8 @@ name: Android release artifacts
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
