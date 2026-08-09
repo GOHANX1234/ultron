@@ -347,9 +347,11 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
                             ),
                           ),
                         ],
+                      ),
           ),
-    );
-  }
+        ),
+      );
+    }
 
   Widget _buildStatColumn(String label, String value, {Color? color, required bool isDark}) {
     final baseColor = color ?? Theme.of(context).colorScheme.onSurface;
