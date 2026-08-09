@@ -13,9 +13,10 @@ dependencies:
   # HTTP & API
   http: ^1.4.0
 
-  # Voice
+  # Voice & Neural TTS
   speech_to_text: ^7.0.0
-  flutter_tts: ^4.2.0
+  sherpa_onnx: ^1.10.37
+  audioplayers: ^6.1.0
 
   # App management
   installed_apps: ^1.5.0

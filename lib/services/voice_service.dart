@@ -1,190 +1,195 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:speech_to_text/speech_recognition_result.dart';
-import 'package:flutter_tts/flutter_tts.dart';
+import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
+import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
 
 class VoiceService {
   final stt.SpeechToText _speech = stt.SpeechToText();
-  final FlutterTts _tts = FlutterTts();
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  
+  sherpa.OfflineTts? _sherpaTts;
   bool _isInitialized = false;
   bool _isListening = false;
-  bool _voiceSelected = false;
+  bool _isModelReady = false;
+  bool _isDownloadingModel = false;
 
   bool get isListening => _isListening;
+  bool get isModelReady => _isModelReady;
+  bool get isDownloadingModel => _isDownloadingModel;
 
   Future<void> init() async {
     if (_isInitialized) return;
 
+    // Initialize STT
     _isInitialized = await _speech.initialize(
       onError: (error) {
         _isListening = false;
       },
     );
 
-    // Default TTS configuration for natural deep male AI assistant (Ultron style)
-    await _tts.setLanguage('en-US');
-    await _tts.setSpeechRate(0.48); // Slightly slower for clarity & authority
-    await _tts.setVolume(1.0);
-    await _tts.setPitch(0.88); // Natural deep male tone without robotic pitch distortion
-
-    await _selectMaleVoice();
+    // Initialize Sherpa-ONNX bindings & Piper VITS Male TTS model
+    _initSherpaOnnx();
   }
 
-  Future<void> _selectMaleVoice() async {
+  Future<void> _initSherpaOnnx() async {
     try {
-      final voices = await _tts.getVoices;
-      if (voices is List && voices.isNotEmpty) {
-        Map? bestMaleVoice;
-        int highestScore = -999;
+      sherpa.initBindings();
 
-        for (var voice in voices) {
-          if (voice is Map) {
-            final name = (voice['name'] ?? '').toString().toLowerCase();
-            final locale = (voice['locale'] ?? '').toString().toLowerCase();
-            final gender = (voice['gender'] ?? '').toString().toLowerCase();
+      final dir = await getApplicationDocumentsDirectory();
+      final modelDir = Directory('${dir.path}/sherpa_onnx_piper');
 
-            // English voices preferred
-            if (locale.isNotEmpty && !locale.startsWith('en')) continue;
+      final modelPath = '${modelDir.path}/en_US-lessac-medium.onnx';
+      final tokensPath = '${modelDir.path}/tokens.txt';
+      final dataDirPath = '${modelDir.path}/espeak-ng-data';
 
-            int score = 0;
+      final modelFile = File(modelPath);
+      final tokensFile = File(tokensPath);
 
-            // 1. Comprehensive Female Voice Exclusion
-            final isFemale = gender == 'female' ||
-                name.contains('female') ||
-                name.contains('woman') ||
-                name.contains('girl') ||
-                name.contains('lady') ||
-                name.contains('mother') ||
-                name.contains('zira') ||
-                name.contains('hazel') ||
-                name.contains('samantha') ||
-                name.contains('victoria') ||
-                name.contains('karen') ||
-                name.contains('fiona') ||
-                name.contains('moira') ||
-                name.contains('veena') ||
-                name.contains('nora') ||
-                name.contains('eva') ||
-                name.contains('jenny') ||
-                name.contains('aria') ||
-                name.contains('anna') ||
-                name.contains('serena') ||
-                name.contains('catherine') ||
-                name.contains('susan') ||
-                name.contains('lisa') ||
-                name.contains('melanie') ||
-                // Google TTS Female voice patterns:
-                name.contains('en-us-x-sfa') ||
-                name.contains('en-us-x-sfb') ||
-                name.contains('en-us-x-sfc') ||
-                name.contains('en-us-x-sfe') ||
-                name.contains('en-us-x-sfg') ||
-                name.contains('en-us-x-sfh') ||
-                name.contains('en-us-x-sfi') ||
-                name.contains('en-us-x-tpa') ||
-                name.contains('en-us-x-tpb') ||
-                name.contains('en-us-x-tpc') ||
-                name.contains('en-us-x-tpd') ||
-                name.contains('en-us-x-tpe') ||
-                name.contains('en-us-x-tpf') ||
-                name.contains('en-us-x-ioa') ||
-                name.contains('en-us-x-ioc') ||
-                name.contains('en-us-x-iod') ||
-                name.contains('en-us-x-lfe') ||
-                name.contains('en-us-x-rgf') ||
-                name.contains('en-us-x-pfi') ||
-                name.contains('en-gb-x-gbc') ||
-                name.contains('en-gb-x-gbd') ||
-                name.contains('en-gb-x-sfc') ||
-                // Samsung & SVOX Female voice patterns:
-                name.contains('_f00') ||
-                name.contains('_f0') ||
-                name.contains('_f1') ||
-                name.contains('_f2') ||
-                name.contains('_female') ||
-                // Espeak Female patterns:
-                name.contains('+f1') ||
-                name.contains('+f2') ||
-                name.contains('+f3') ||
-                name.contains('+f4');
+      if (!await modelFile.exists() || !await tokensFile.exists()) {
+        _downloadModelFiles(modelDir, modelPath, tokensPath, dataDirPath);
+        return;
+      }
 
-            if (isFemale) {
-              score -= 1000;
-            }
+      final config = sherpa.OfflineTtsConfig(
+        model: sherpa.OfflineTtsModelConfig(
+          vits: sherpa.OfflineTtsVitsModelConfig(
+            model: modelPath,
+            tokens: tokensPath,
+            dataDir: dataDirPath,
+          ),
+          numThreads: 2,
+          debug: 0,
+        ),
+      );
 
-            // 2. Male Voice High-Priority Matching
-            if (gender == 'male') score += 100;
+      _sherpaTts = sherpa.OfflineTts(config);
+      _isModelReady = true;
+    } catch (e) {
+      debugPrint('Sherpa-ONNX initialization exception: $e');
+    }
+  }
 
-            // Google TTS Male voice identifiers:
-            if (name.contains('en-us-x-iom') || // Deep US Male
-                name.contains('en-us-x-iob') || // US Male
-                name.contains('en-us-x-iol') || // US Male
-                name.contains('en-us-x-sfd') || // US Male Standard
-                name.contains('en-us-x-gqd') || // US Male
-                name.contains('en-us-x-und') || // US Male
-                name.contains('en-us-x-mwa') || // US Male
-                name.contains('en-us-x-rod') || // US Male
-                name.contains('en-us-x-std') || // US Male
-                name.contains('en-us-x-dfz')) { // US Male
-              score += 90;
-            }
+  Future<void> _downloadModelFiles(
+    Directory modelDir,
+    String modelPath,
+    String tokensPath,
+    String dataDirPath,
+  ) async {
+    if (_isDownloadingModel) return;
+    _isDownloadingModel = true;
 
-            if (name.contains('en-gb-x-rdb') || // UK Male
-                name.contains('en-gb-x-fis') || // UK Male
-                name.contains('en-gb-x-gba') || // UK Male
-                name.contains('en-gb-x-gbb')) { // UK Male
-              score += 85;
-            }
+    try {
+      if (!await modelDir.exists()) {
+        await modelDir.create(recursive: true);
+      }
 
-            // Name-based male indicators:
-            if (name.contains('male') ||
-                name.contains('guy') ||
-                name.contains('man') ||
-                name.contains('david') ||
-                name.contains('james') ||
-                name.contains('daniel') ||
-                name.contains('george') ||
-                name.contains('alex') ||
-                name.contains('fred') ||
-                name.contains('bruce') ||
-                name.contains('aaron') ||
-                name.contains('oliver') ||
-                name.contains('arthur') ||
-                name.contains('rishi') ||
-                name.contains('ryan') ||
-                name.contains('chris') ||
-                name.contains('jarvis') ||
-                name.contains('ultron') ||
-                name.contains('_m0') ||
-                name.contains('_m1') ||
-                name.contains('_m2') ||
-                name.contains('_m_') ||
-                name.contains('-m-') ||
-                name.contains('+m1') ||
-                name.contains('+m2') ||
-                name.contains('+m3')) {
-              score += 50;
-            }
+      // Piper VITS Male model download URLs (csukuangfj / sherpa-onnx releases)
+      const baseUrl =
+          'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium';
 
-            // Base preference for en-US locale
-            if (locale == 'en-us' || locale == 'en_us') score += 10;
+      final filesToDownload = {
+        '$baseUrl/en_US-lessac-medium.onnx': modelPath,
+        '$baseUrl/tokens.txt': tokensPath,
+      };
 
-            if (score > highestScore) {
-              highestScore = score;
-              bestMaleVoice = voice;
-            }
-          }
-        }
-
-        if (bestMaleVoice != null && highestScore > -500) {
-          final voiceMap = <String, String>{
-            "name": bestMaleVoice["name"].toString(),
-            "locale": bestMaleVoice["locale"].toString(),
-          };
-          await _tts.setVoice(voiceMap);
-          _voiceSelected = true;
+      for (var entry in filesToDownload.entries) {
+        final res = await http.get(Uri.parse(entry.key));
+        if (res.statusCode == 200) {
+          await File(entry.value).writeAsBytes(res.bodyBytes);
         }
       }
-    } catch (_) {}
+
+      _isDownloadingModel = false;
+      await _initSherpaOnnx();
+    } catch (e) {
+      _isDownloadingModel = false;
+      debugPrint('Failed downloading Piper VITS model files: $e');
+    }
+  }
+
+  /// Convert Float32 audio samples into a standard 16-bit WAV file buffer
+  Uint8List _createWavBuffer(Float32List samples, int sampleRate) {
+    final int numSamples = samples.length;
+    final int byteRate = sampleRate * 2; // 1 channel * 16-bit (2 bytes)
+    final int dataSize = numSamples * 2;
+    final int fileSize = 36 + dataSize;
+
+    final ByteData buffer = ByteData(44 + dataSize);
+
+    // RIFF Header
+    buffer.setUint8(0, 0x52); // R
+    buffer.setUint8(1, 0x49); // I
+    buffer.setUint8(2, 0x46); // F
+    buffer.setUint8(3, 0x46); // F
+    buffer.setUint32(4, fileSize, Endian.little);
+    buffer.setUint8(8, 0x57);  // W
+    buffer.setUint8(9, 0x41);  // A
+    buffer.setUint8(10, 0x56); // V
+    buffer.setUint8(11, 0x45); // E
+
+    // fmt subchunk
+    buffer.setUint8(12, 0x66); // f
+    buffer.setUint8(13, 0x6D); // m
+    buffer.setUint8(14, 0x74); // t
+    buffer.setUint8(15, 0x20); // ' '
+    buffer.setUint32(16, 16, Endian.little); // Subchunk1Size
+    buffer.setUint16(20, 1, Endian.little);  // AudioFormat (PCM)
+    buffer.setUint16(22, 1, Endian.little);  // NumChannels (1 = Mono)
+    buffer.setUint32(24, sampleRate, Endian.little);
+    buffer.setUint32(28, byteRate, Endian.little);
+    buffer.setUint16(32, 2, Endian.little);  // BlockAlign
+    buffer.setUint16(34, 16, Endian.little); // BitsPerSample
+
+    // data subchunk
+    buffer.setUint8(36, 0x64); // d
+    buffer.setUint8(37, 0x61); // a
+    buffer.setUint8(38, 0x74); // t
+    buffer.setUint8(39, 0x61); // a
+    buffer.setUint32(40, dataSize, Endian.little);
+
+    // 16-bit PCM Conversion
+    int offset = 44;
+    for (int i = 0; i < numSamples; i++) {
+      double sample = samples[i].clamp(-1.0, 1.0);
+      int sampleInt16 = (sample < 0) ? (sample * 32768).toInt() : (sample * 32767).toInt();
+      buffer.setInt16(offset, sampleInt16, Endian.little);
+      offset += 2;
+    }
+
+    return buffer.buffer.asUint8List();
+  }
+
+  /// Speak text aloud using Sherpa-ONNX Piper VITS male voice
+  Future<void> speak(String text) async {
+    if (text.trim().isEmpty) return;
+
+    try {
+      if (!_isModelReady || _sherpaTts == null) {
+        await _initSherpaOnnx();
+      }
+
+      if (_sherpaTts != null) {
+        // Generate high quality neural male speech
+        final audio = _sherpaTts!.generate(text.trim(), sid: 0, speed: 1.0);
+        if (audio.samples.isNotEmpty) {
+          final wavBytes = _createWavBuffer(audio.samples, audio.sampleRate);
+          await _audioPlayer.stop();
+          await _audioPlayer.play(BytesSource(wavBytes));
+        }
+      }
+    } catch (e) {
+      debugPrint('Sherpa-ONNX speak error: $e');
+    }
+  }
+
+  /// Stop speaking
+  Future<void> stopSpeaking() async {
+    await _audioPlayer.stop();
   }
 
   /// Start listening for speech. Returns transcribed text via callback.
@@ -218,26 +223,9 @@ class VoiceService {
     await _speech.stop();
   }
 
-  /// Speak text aloud
-  Future<void> speak(String text) async {
-    if (text.isEmpty) return;
-    if (!_isInitialized) {
-      await init();
-    } else if (!_voiceSelected) {
-      await _selectMaleVoice();
-    }
-    await _tts.setPitch(0.88); // Natural deep male tone
-    await _tts.speak(text);
-  }
-
-  /// Stop speaking
-  Future<void> stopSpeaking() async {
-    await _tts.stop();
-  }
-
   void dispose() {
     _speech.stop();
-    _tts.stop();
+    _audioPlayer.dispose();
   }
 }
 
