@@ -406,7 +406,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: isDark ? const Color(0xFF090D16) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
@@ -434,42 +434,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
         centerTitle: true,
       ),
-      body: Stack(
-        children: [
-          // Ambient Glow Background
-          Positioned(
-            top: -100,
-            left: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -50,
-            right: -50,
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.purple.withValues(alpha: 0.2),
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-              child: Container(
-                color: isDark ? const Color(0xFF0F172A).withValues(alpha: 0.8) : const Color(0xFFF8FAFC).withValues(alpha: 0.8),
-              ),
-            ),
-          ),
-          ListView(
+      body: ListView(
             padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + kToolbarHeight + 20, 20, 40),
             physics: const BouncingScrollPhysics(),
             children: [
@@ -892,8 +857,6 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
             ],
           ),
-        ],
-      ),
     );
   }
   

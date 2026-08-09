@@ -89,6 +89,7 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
+      backgroundColor: isDark ? const Color(0xFF090D16) : const Color(0xFFF8FAFC),
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
         child: ClipRRect(
@@ -119,40 +120,7 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
           ),
         ),
       ),
-      body: Stack(
-        children: [
-          // Ambient Glow Orbs
-          Positioned(
-            top: -100,
-            left: -50,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.blue.withValues(alpha: 0.15),
-                boxShadow: [
-                  BoxShadow(color: Colors.blue.withValues(alpha: 0.15), blurRadius: 100, spreadRadius: 50),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -50,
-            right: -100,
-            child: Container(
-              width: 350,
-              height: 350,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.purple.withValues(alpha: 0.1),
-                boxShadow: [
-                  BoxShadow(color: Colors.purple.withValues(alpha: 0.1), blurRadius: 120, spreadRadius: 60),
-                ],
-              ),
-            ),
-          ),
-          SafeArea(
+      body: SafeArea(
             bottom: false,
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -379,10 +347,7 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
                             ),
                           ),
                         ],
-                      ),
           ),
-        ],
-      ),
     );
   }
 
