@@ -8,6 +8,7 @@ import 'dart:math' as math;
 import '../config/feature_flags.dart';
 import '../services/ai_service.dart';
 import '../services/screen_automation_service.dart';
+import '../services/voice_service.dart';
 import 'home_screen.dart';
 
 /// Custom painter for the Gemini-style multi-faceted sparkle icon
@@ -100,6 +101,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   final ScreenAutomationService _screenAutomationService =
       ScreenAutomationService();
   final AiService _aiService = AiService();
+  final VoiceService _voiceService = VoiceService();
 
   late AnimationController _liquidAnimationController;
   late Animation<double> _liquidAnimation;
@@ -114,6 +116,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   bool _isPhoneGranted = false;
   bool _isSmsGranted = false;
   bool _isOverlayGranted = false;
+
+  // Offline TTS Voice Model states
+  bool _isTtsDownloaded = false;
+  bool _isDownloadingTts = false;
+  double _ttsDownloadProgress = 0.0;
+  String _ttsDownloadStatus = '';
 
   // AI config states
   String _selectedProvider = 'deepseek';
@@ -198,6 +206,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     final overlayGranted = FeatureFlags.floatingOverlayEnabled
         ? await FlutterOverlayWindow.isPermissionGranted()
         : false;
+    final ttsDownloaded = await _voiceService.checkIsModelDownloaded();
 
     if (mounted) {
       setState(() {
@@ -208,7 +217,74 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         _isPhoneGranted = phoneStatus.isGranted;
         _isSmsGranted = smsStatus.isGranted;
         _isOverlayGranted = overlayGranted;
+        _isTtsDownloaded = ttsDownloaded;
       });
+    }
+  }
+
+  Future<void> _downloadTtsModel() async {
+    if (_isDownloadingTts) return;
+    setState(() {
+      _isDownloadingTts = true;
+      _ttsDownloadProgress = 0.05;
+      _ttsDownloadStatus = 'Starting download...';
+    });
+
+    try {
+      final success = await _voiceService.downloadModelFiles(
+        onProgress: (progress, status) {
+          if (mounted) {
+            setState(() {
+              _ttsDownloadProgress = progress;
+              _ttsDownloadStatus = status;
+            });
+          }
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _isDownloadingTts = false;
+          _isTtsDownloaded = success;
+        });
+
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: Colors.white),
+                  SizedBox(width: 10),
+                  Text('Neural Male TTS Voice model ready (63 MB)!'),
+                ],
+              ),
+              backgroundColor: const Color(0xFF10B981),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isDownloadingTts = false;
+          _ttsDownloadStatus = 'Download failed';
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Download Error: ${e.toString().replaceFirst('Exception: ', '')}'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -646,6 +722,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   bool get _canProceedToModel {
     return _isAccessibilityGranted &&
         _isMicrophoneGranted &&
+        _isTtsDownloaded &&
         (!FeatureFlags.floatingOverlayEnabled || _isOverlayGranted);
   }
 
@@ -653,6 +730,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     int count = 0;
     if (_isAccessibilityGranted) count++;
     if (_isMicrophoneGranted) count++;
+    if (_isTtsDownloaded) count++;
     if (_isOverlayGranted && FeatureFlags.floatingOverlayEnabled) count++;
     if (_isNotificationsGranted) count++;
     if (_isContactsGranted) count++;
@@ -662,7 +740,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   int get _totalCount {
-    return FeatureFlags.floatingOverlayEnabled ? 7 : 6;
+    return FeatureFlags.floatingOverlayEnabled ? 8 : 7;
   }
 
   @override
@@ -1400,7 +1478,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             padding: const EdgeInsets.symmetric(horizontal: 20),
             children: [
-              _buildCategoryHeader('Core Permissions (Required)', isDark),
+              _buildCategoryHeader('Core Permissions & Engine (Required)', isDark),
               _buildPermissionGlassCard(
                 title: 'Screen Automation (Accessibility)',
                 subtitle:
@@ -1421,6 +1499,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 onGrant: () => _requestPermission(Permission.microphone),
                 isDark: isDark,
               ),
+              _buildTtsDownloadGlassCard(isDark),
               if (FeatureFlags.floatingOverlayEnabled)
                 _buildPermissionGlassCard(
                   title: 'Floating Overlay Window',
@@ -1735,6 +1814,213 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTtsDownloadGlassCard(bool isDark) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: LiquidGlassContainer(
+        borderRadius: 18,
+        padding: const EdgeInsets.all(16),
+        borderColor: _isTtsDownloaded
+            ? const Color(0xFF10B981).withOpacity(0.35)
+            : const Color(0xFF6366F1).withOpacity(0.2),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    gradient: LinearGradient(
+                      colors: _isTtsDownloaded
+                          ? [
+                              const Color(0xFF10B981).withOpacity(0.15),
+                              const Color(0xFF059669).withOpacity(0.06),
+                            ]
+                          : [
+                              const Color(0xFF6366F1).withOpacity(0.12),
+                              const Color(0xFF3B82F6).withOpacity(0.05),
+                            ],
+                    ),
+                  ),
+                  child: Icon(
+                    _isTtsDownloaded
+                        ? Icons.record_voice_over_rounded
+                        : Icons.download_for_offline_rounded,
+                    size: 20,
+                    color: _isTtsDownloaded
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF6366F1),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Offline TTS Voice Engine',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Piper VITS Neural Voice (~63 MB). Required for speech output.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.35,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!_isTtsDownloaded)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: const Color(0xFF6366F1).withOpacity(0.12),
+                      border: Border.all(
+                        color: const Color(0xFF6366F1).withOpacity(0.2),
+                      ),
+                    ),
+                    child: const Text(
+                      'REQUIRED',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: Color(0xFF6366F1),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            if (_isDownloadingTts) ...[
+              const SizedBox(height: 14),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: _ttsDownloadProgress,
+                  backgroundColor: isDark
+                      ? Colors.white.withOpacity(0.08)
+                      : Colors.black.withOpacity(0.05),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFF6366F1),
+                  ),
+                  minHeight: 6,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _ttsDownloadStatus,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: _isTtsDownloaded
+                    ? Container(
+                        key: const ValueKey('downloaded'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFF10B981).withOpacity(0.12),
+                              const Color(0xFF059669).withOpacity(0.06),
+                            ],
+                          ),
+                          border: Border.all(
+                            color: const Color(0xFF10B981).withOpacity(0.25),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle_rounded,
+                              size: 14,
+                              color: Color(0xFF10B981),
+                            ),
+                            SizedBox(width: 5),
+                            Text(
+                              'Downloaded',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF10B981),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ElevatedButton.icon(
+                        key: const ValueKey('download_btn'),
+                        onPressed: _isDownloadingTts ? null : _downloadTtsModel,
+                        icon: _isDownloadingTts
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Icon(Icons.download_rounded, size: 15),
+                        label: Text(
+                          _isDownloadingTts ? 'Downloading...' : 'Download (63 MB)',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366F1),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                       ),

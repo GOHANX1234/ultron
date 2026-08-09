@@ -22,6 +22,19 @@ class VoiceService {
   bool get isModelReady => _isModelReady;
   bool get isDownloadingModel => _isDownloadingModel;
 
+  /// Check if the TTS neural model files exist locally
+  Future<bool> checkIsModelDownloaded() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final modelDir = Directory('${dir.path}/sherpa_onnx_piper');
+      final modelFile = File('${modelDir.path}/en_US-lessac-medium.onnx');
+      final tokensFile = File('${modelDir.path}/tokens.txt');
+      return await modelFile.exists() && await tokensFile.exists();
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> init() async {
     if (_isInitialized) return;
 
@@ -32,8 +45,8 @@ class VoiceService {
       },
     );
 
-    // Initialize Sherpa-ONNX bindings & Piper VITS Male TTS model
-    _initSherpaOnnx();
+    // Initialize Sherpa-ONNX bindings & Piper VITS Male TTS model (only if already downloaded)
+    await _initSherpaOnnx();
   }
 
   Future<void> _initSherpaOnnx() async {
@@ -51,7 +64,7 @@ class VoiceService {
       final tokensFile = File(tokensPath);
 
       if (!await modelFile.exists() || !await tokensFile.exists()) {
-        _downloadModelFiles(modelDir, modelPath, tokensPath, dataDirPath);
+        _isModelReady = false;
         return;
       }
 
@@ -74,41 +87,72 @@ class VoiceService {
     }
   }
 
-  Future<void> _downloadModelFiles(
-    Directory modelDir,
-    String modelPath,
-    String tokensPath,
-    String dataDirPath,
-  ) async {
-    if (_isDownloadingModel) return;
+  /// Explicitly download model files with progress callback
+  Future<bool> downloadModelFiles({Function(double progress, String status)? onProgress}) async {
+    if (_isDownloadingModel) return false;
     _isDownloadingModel = true;
 
     try {
+      final dir = await getApplicationDocumentsDirectory();
+      final modelDir = Directory('${dir.path}/sherpa_onnx_piper');
+      final modelPath = '${modelDir.path}/en_US-lessac-medium.onnx';
+      final tokensPath = '${modelDir.path}/tokens.txt';
+
       if (!await modelDir.exists()) {
         await modelDir.create(recursive: true);
       }
 
-      // Piper VITS Male model download URLs (csukuangfj / sherpa-onnx releases)
       const baseUrl =
           'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium';
 
-      final filesToDownload = {
-        '$baseUrl/en_US-lessac-medium.onnx': modelPath,
-        '$baseUrl/tokens.txt': tokensPath,
-      };
-
-      for (var entry in filesToDownload.entries) {
-        final res = await http.get(Uri.parse(entry.key));
-        if (res.statusCode == 200) {
-          await File(entry.value).writeAsBytes(res.bodyBytes);
-        }
+      onProgress?.call(0.05, 'Downloading model tokens...');
+      final tokensRes = await http.get(Uri.parse('$baseUrl/tokens.txt'));
+      if (tokensRes.statusCode == 200) {
+        await File(tokensPath).writeAsBytes(tokensRes.bodyBytes);
+      } else {
+        throw Exception('Failed downloading tokens file (${tokensRes.statusCode})');
       }
 
+      onProgress?.call(0.10, 'Downloading neural TTS voice model (~63 MB)...');
+      final request = http.Request('GET', Uri.parse('$baseUrl/en_US-lessac-medium.onnx'));
+      final response = await http.Client().send(request);
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed downloading ONNX model file (${response.statusCode})');
+      }
+
+      final totalBytes = response.contentLength ?? 66300000;
+      int downloadedBytes = 0;
+      final file = File(modelPath);
+      final sink = file.openWrite();
+
+      await for (var chunk in response.stream) {
+        downloadedBytes += chunk.length;
+        sink.add(chunk);
+        double progress = 0.10 + (downloadedBytes / totalBytes) * 0.85;
+        if (progress > 0.95) progress = 0.95;
+        onProgress?.call(
+          progress,
+          'Downloading voice model: ${(downloadedBytes / (1024 * 1024)).toStringAsFixed(1)} MB / ${(totalBytes / (1024 * 1024)).toStringAsFixed(1)} MB',
+        );
+      }
+
+      await sink.flush();
+      await sink.close();
+
+      onProgress?.call(0.98, 'Initializing offline voice engine...');
       _isDownloadingModel = false;
       await _initSherpaOnnx();
+
+      if (_isModelReady) {
+        onProgress?.call(1.0, 'Voice model downloaded and ready!');
+        return true;
+      }
+      return false;
     } catch (e) {
       _isDownloadingModel = false;
       debugPrint('Failed downloading Piper VITS model files: $e');
+      rethrow;
     }
   }
 
