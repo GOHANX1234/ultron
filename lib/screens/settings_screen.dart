@@ -7,6 +7,7 @@ import '../services/ai_service.dart';
 import '../services/shizuku_service.dart';
 import '../services/screen_automation_service.dart';
 import '../services/telegram_service.dart';
+import '../services/voice_service.dart';
 import 'task_history_screen.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import '../config/feature_flags.dart';
@@ -16,6 +17,7 @@ class SettingsScreen extends StatefulWidget {
   final ShizukuService shizukuService;
   final ScreenAutomationService screenAutomationService;
   final TelegramService telegramService;
+  final VoiceService? voiceService;
 
   const SettingsScreen({
     super.key,
@@ -23,6 +25,7 @@ class SettingsScreen extends StatefulWidget {
     required this.shizukuService,
     required this.screenAutomationService,
     required this.telegramService,
+    this.voiceService,
   });
 
   @override
@@ -31,12 +34,20 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen>
     with WidgetsBindingObserver {
+  late final VoiceService _voiceService;
   late TextEditingController _apiKeyController;
   late TextEditingController _baseUrlController;
   late TextEditingController _modelController;
   late TextEditingController _telegramTokenController;
+  late TextEditingController _ttsApiKeyController;
+  late TextEditingController _ttsEndpointController;
+  late TextEditingController _ttsModelController;
+  late TextEditingController _ttsVoiceController;
   bool _obscureKey = true;
+  bool _obscureTtsKey = true;
   bool _telegramEnabled = false;
+  bool _ttsEnabled = true;
+  bool _isTestingTts = false;
   double _maxSteps = 15;
   bool _disableMaxSteps = false;
   late TextEditingController _maxTokensController;
@@ -52,6 +63,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _voiceService = widget.voiceService ?? VoiceService();
     _apiKeyController = TextEditingController(text: widget.aiService.apiKey);
     _baseUrlController = TextEditingController(text: widget.aiService.baseUrl);
     _modelController = TextEditingController(text: widget.aiService.model);
@@ -59,6 +71,12 @@ class _SettingsScreenState extends State<SettingsScreen>
       text: widget.telegramService.botToken,
     );
     _telegramEnabled = widget.telegramService.isEnabled;
+    _ttsApiKeyController = TextEditingController(text: _voiceService.ttsApiKey);
+    _ttsEndpointController =
+        TextEditingController(text: _voiceService.ttsEndpoint);
+    _ttsModelController = TextEditingController(text: _voiceService.ttsModel);
+    _ttsVoiceController = TextEditingController(text: _voiceService.ttsVoice);
+    _ttsEnabled = _voiceService.isTtsEnabled;
     _maxSteps = widget.aiService.rawMaxSteps.toDouble();
     _disableMaxSteps = widget.aiService.disableMaxSteps;
     _temperature = widget.aiService.temperature;
@@ -74,10 +92,28 @@ class _SettingsScreenState extends State<SettingsScreen>
     _modelController.addListener(_autoSave);
     _telegramTokenController.addListener(_autoSave);
     _maxTokensController.addListener(_autoSave);
+    _ttsApiKeyController.addListener(_autoSave);
+    _ttsEndpointController.addListener(_autoSave);
+    _ttsModelController.addListener(_autoSave);
+    _ttsVoiceController.addListener(_autoSave);
 
+    _initVoiceSettings();
     _checkPermissions();
     if (FeatureFlags.floatingOverlayEnabled) {
       _checkOverlayStatus();
+    }
+  }
+
+  Future<void> _initVoiceSettings() async {
+    await _voiceService.init();
+    if (mounted) {
+      setState(() {
+        _ttsApiKeyController.text = _voiceService.ttsApiKey;
+        _ttsEndpointController.text = _voiceService.ttsEndpoint;
+        _ttsModelController.text = _voiceService.ttsModel;
+        _ttsVoiceController.text = _voiceService.ttsVoice;
+        _ttsEnabled = _voiceService.isTtsEnabled;
+      });
     }
   }
 
@@ -100,11 +136,19 @@ class _SettingsScreenState extends State<SettingsScreen>
     _modelController.removeListener(_autoSave);
     _telegramTokenController.removeListener(_autoSave);
     _maxTokensController.removeListener(_autoSave);
+    _ttsApiKeyController.removeListener(_autoSave);
+    _ttsEndpointController.removeListener(_autoSave);
+    _ttsModelController.removeListener(_autoSave);
+    _ttsVoiceController.removeListener(_autoSave);
     _apiKeyController.dispose();
     _baseUrlController.dispose();
     _modelController.dispose();
     _telegramTokenController.dispose();
     _maxTokensController.dispose();
+    _ttsApiKeyController.dispose();
+    _ttsEndpointController.dispose();
+    _ttsModelController.dispose();
+    _ttsVoiceController.dispose();
     super.dispose();
   }
 
@@ -157,6 +201,14 @@ class _SettingsScreenState extends State<SettingsScreen>
       isEnabled: _telegramEnabled,
     );
 
+    _voiceService.saveSettings(
+      apiKey: _ttsApiKeyController.text.trim(),
+      endpoint: _ttsEndpointController.text.trim(),
+      model: _ttsModelController.text.trim(),
+      voice: _ttsVoiceController.text.trim(),
+      enabled: _ttsEnabled,
+    );
+
     widget.aiService.saveMaxSteps(_maxSteps.toInt());
     widget.aiService.saveDisableMaxSteps(_disableMaxSteps);
     widget.aiService.saveAdvancedSettings(
@@ -165,6 +217,39 @@ class _SettingsScreenState extends State<SettingsScreen>
       useScreenCompression: _useScreenCompression,
       useSystemPrompt: _useSystemPrompt,
     );
+  }
+
+  Future<void> _testTtsVoice() async {
+    final apiKey = _ttsApiKeyController.text.trim();
+    if (apiKey.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please enter a TTS API Key first.'),
+          backgroundColor: Colors.orangeAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isTestingTts = true);
+
+    await _voiceService.saveSettings(
+      apiKey: apiKey,
+      endpoint: _ttsEndpointController.text.trim(),
+      model: _ttsModelController.text.trim(),
+      voice: _ttsVoiceController.text.trim(),
+      enabled: true,
+    );
+
+    await _voiceService.speak(
+      'Hello! Ultron 3 Text to Speech is configured and working properly.',
+    );
+
+    if (mounted) {
+      setState(() => _isTestingTts = false);
+    }
   }
 
   Future<void> _fetchModels() async {
@@ -757,7 +842,127 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ],
               ),
 
-              // 5. Telegram Remote Access Card
+              // 5. Text-to-Speech (TTS) Voice Card
+              _buildSettingsCard(
+                icon: Icons.record_voice_over_rounded,
+                title: 'Text-to-Speech (Voice Output)',
+                subtitle: 'StepAudio Cloud TTS (MP3 format)',
+                isDark: isDark,
+                children: [
+                  _buildGlassSwitch(
+                    title: 'Enable Voice Output',
+                    subtitle: 'Speak AI conversational answers aloud',
+                    value: _ttsEnabled,
+                    onChanged: (val) {
+                      setState(() => _ttsEnabled = val);
+                      _autoSave();
+                    },
+                    isDark: isDark,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _ttsApiKeyController,
+                    decoration: _buildInputDecoration(
+                      labelText: 'TTS API Key',
+                      hintText: 'sk-...',
+                      prefixIcon: const Icon(Icons.key_rounded, size: 20),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureTtsKey
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded,
+                          size: 20,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscureTtsKey = !_obscureTtsKey),
+                      ),
+                    ),
+                    obscureText: _obscureTtsKey,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _ttsEndpointController,
+                    decoration: _buildInputDecoration(
+                      labelText: 'TTS Endpoint URL',
+                      hintText: 'https://api.hcnsec.cn/v1/audio/speech',
+                      prefixIcon: const Icon(Icons.link_rounded, size: 20),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _ttsModelController,
+                          decoration: _buildInputDecoration(
+                            labelText: 'TTS Model',
+                            hintText: 'stepaudio-2.5-tts',
+                            prefixIcon: const Icon(
+                              Icons.graphic_eq_rounded,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _ttsVoiceController,
+                          decoration: _buildInputDecoration(
+                            labelText: 'Voice Name',
+                            hintText: 'cixingnansheng',
+                            prefixIcon: const Icon(
+                              Icons.person_rounded,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _isTestingTts ? null : _testTtsVoice,
+                      icon: _isTestingTts
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.volume_up_rounded,
+                              size: 20,
+                              color: Colors.white,
+                            ),
+                      label: Text(
+                        _isTestingTts
+                            ? 'Generating Voice...'
+                            : 'Test Voice Output',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // 6. Telegram Remote Access Card
               _buildSettingsCard(
                 icon: Icons.send_and_archive_rounded,
                 title: 'Telegram Remote Access',

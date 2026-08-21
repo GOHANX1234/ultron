@@ -13,9 +13,8 @@ dependencies:
   # HTTP & API
   http: ^1.4.0
 
-  # Voice & Neural TTS
+  # Voice & Cloud TTS
   speech_to_text: ^7.0.0
-  sherpa_onnx: ^1.10.37
   audioplayers: ^6.1.0
 
   # App management
