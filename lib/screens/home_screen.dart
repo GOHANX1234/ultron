@@ -114,6 +114,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
     final assistantIndex = _messages.length - 1;
 
+    await _voiceService.stopSpeaking();
+
     try {
       final isAgent = _mode == 'agent';
       final stream = _aiService
@@ -131,8 +133,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           );
       String accumulated = '';
 
+      final bool isTtsStreaming =
+          _voiceService.isTtsEnabled && _voiceService.isConfigured;
+      if (isTtsStreaming) {
+        _voiceService.startStreamingSession();
+      }
+      bool detectedAction = false;
+
       await for (final chunk in stream) {
         accumulated += chunk;
+
+        if (isTtsStreaming && !detectedAction) {
+          final trimmed = accumulated.trimLeft();
+          if (trimmed.startsWith('{') ||
+              trimmed.startsWith('```json') ||
+              trimmed.startsWith('```')) {
+            detectedAction = true;
+            _voiceService.cancelStreamingSession();
+          } else {
+            _voiceService.feedStreamChunk(chunk);
+          }
+        }
+
         if (mounted) {
           setState(() {
             _messages[assistantIndex] = ChatMessage(
@@ -149,6 +171,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final action = _aiService.parseAction(accumulated);
 
       if (action != null) {
+        _voiceService.cancelStreamingSession();
         // If it's an action, we remove the raw JSON message from display
         setState(() {
           _messages.removeAt(assistantIndex);
@@ -205,12 +228,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     : 'Agent could not complete the task.'),
           );
         }
+        if (action.response.isNotEmpty) {
+          _voiceService.speak(action.response);
+        }
         await _saveSession();
       } else {
-        // Plain text response, we already rendered it, just speak it
-        _voiceService.speak(accumulated);
+        // Plain text response: finish streaming session to flush any remaining buffer
+        if (isTtsStreaming && !detectedAction) {
+          _voiceService.finishStreamingSession();
+        } else {
+          _voiceService.speak(accumulated);
+        }
       }
     } catch (e) {
+      _voiceService.cancelStreamingSession();
       if (mounted) {
         setState(() {
           if (_messages.isNotEmpty && _messages.length > assistantIndex) {
@@ -301,6 +332,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _toggleVoice() async {
+    await _voiceService.stopSpeaking();
     if (_isListening) {
       await _voiceService.stopListening();
       setState(() => _isListening = false);
