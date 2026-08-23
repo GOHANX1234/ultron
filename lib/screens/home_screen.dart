@@ -7,6 +7,7 @@ import '../models/chat_message.dart';
 import '../services/ai_service.dart';
 import '../services/action_handler.dart';
 import '../services/voice_service.dart';
+import '../widgets/floating_nav_bar.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/thinking_avatar.dart';
 import '../services/telegram_service.dart';
@@ -598,8 +599,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           // Main Column layout
           Column(
             children: [
-              // Floating Glass Header (Replaces heavy standard AppBar)
-              _buildFloatingHeader(context, isDark),
+              // Floating glass nav bar (replaces a heavy standard AppBar).
+              // Its fields are all stable across a streaming reply, and it
+              // defines ==, so it is skipped by the per-token setState.
+              FloatingNavBar(
+                isDark: isDark,
+                busy: _isLoading,
+                onNewChat: _startNewChat,
+                onSettings: _openSettings,
+              ),
 
               // API key warning banner if not configured
               if (!_aiService.isConfigured) _buildApiWarningBanner(context, isDark),
@@ -631,170 +639,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildFloatingHeader(BuildContext context, bool isDark) {
-    return SafeArea(
-      bottom: false,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.09)
-                    : Colors.white.withValues(alpha: 0.78),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.15)
-                      : Colors.white.withValues(alpha: 0.88),
-                  width: 1.0,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: isDark
-                        ? Colors.black.withValues(alpha: 0.28)
-                        : const Color(0x0C0F172A),
-                    blurRadius: 18,
-                    spreadRadius: -2,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  // Menu drawer trigger button
-                  Builder(
-                    builder: (btnContext) => _buildHeaderIconButton(
-                      icon: Icons.menu_rounded,
-                      tooltip: 'Menu',
-                      isDark: isDark,
-                      onPressed: () => Scaffold.of(btnContext).openDrawer(),
-                    ),
-                  ),
-                  const Spacer(),
-                  // Brand Title with Gradient & App Logo
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF6366F1).withValues(alpha: 0.30),
-                              blurRadius: 8,
-                              spreadRadius: 0,
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.asset(
-                            'assets/app-logo.png',
-                            width: 28,
-                            height: 28,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [Color(0xFF6366F1), Color(0xFF0EA5E9), Color(0xFF38BDF8)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ).createShader(bounds),
-                        child: const Text(
-                          'Ultron-3',
-                          style: TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.4,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  // New Chat Action
-                  _buildHeaderIconButton(
-                    icon: Icons.add_comment_outlined,
-                    tooltip: 'New Chat',
-                    isDark: isDark,
-                    onPressed: _isLoading ? null : _startNewChat,
-                  ),
-                  const SizedBox(width: 6),
-                  // Settings Action
-                  _buildHeaderIconButton(
-                    icon: Icons.settings_rounded,
-                    tooltip: 'Settings',
-                    isDark: isDark,
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SettingsScreen(
-                            aiService: _aiService,
-                            shizukuService: _actionHandler.shizuku,
-                            screenAutomationService: _actionHandler.screenAutomation,
-                            telegramService: _telegramService,
-                            voiceService: _voiceService,
-                          ),
-                        ),
-                      );
-                      await _actionHandler.shizuku.checkAvailability();
-                      if (mounted) setState(() {});
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
+  Future<void> _openSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(
+          aiService: _aiService,
+          shizukuService: _actionHandler.shizuku,
+          screenAutomationService: _actionHandler.screenAutomation,
+          telegramService: _telegramService,
+          voiceService: _voiceService,
         ),
       ),
     );
-  }
-
-  Widget _buildHeaderIconButton({
-    required IconData icon,
-    required String tooltip,
-    required bool isDark,
-    required VoidCallback? onPressed,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(14),
-        child: Tooltip(
-          message: tooltip,
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              icon,
-              size: 20,
-              color: isDark
-                  ? (onPressed == null ? Colors.white30 : Colors.white)
-                  : (onPressed == null ? Colors.black26 : const Color(0xFF1E293B)),
-            ),
-          ),
-        ),
-      ),
-    );
+    await _actionHandler.shizuku.checkAvailability();
+    if (mounted) setState(() {});
   }
 
   Widget _buildBackgroundGlows(bool isDark) {
