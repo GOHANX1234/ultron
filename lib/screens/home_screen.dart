@@ -8,6 +8,7 @@ import '../services/ai_service.dart';
 import '../services/action_handler.dart';
 import '../services/voice_service.dart';
 import '../widgets/message_bubble.dart';
+import '../widgets/thinking_avatar.dart';
 import '../services/telegram_service.dart';
 import '../services/chat_history_service.dart';
 import '../services/notification_service.dart';
@@ -56,6 +57,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _startOverlayHistorySync();
     // Register as the handler for overlay bubble tasks
     onOverlayTask = (task) => _sendMessage(task);
+    // Decode the thinking avatar up front so it appears without a first-frame
+    // delay the first time a request is sent.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ThinkingAvatar.precache(context);
+    });
   }
 
   Future<void> _initServices() async {
@@ -1143,6 +1149,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Row(
         children: [
+          const ThinkingAvatar(size: 44),
+          const SizedBox(width: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
@@ -1156,27 +1164,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     : Colors.black.withValues(alpha: 0.06),
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'Thinking...',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
-                ),
-              ],
+            child: Text(
+              'Thinking...',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              ),
             ),
           ),
           const SizedBox(width: 10),
