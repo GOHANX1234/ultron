@@ -24,6 +24,11 @@ class SplashScreen extends StatefulWidget {
   /// it never feels like a wait.
   static const Duration entrance = Duration(milliseconds: 2100);
 
+  /// The entrance when the platform asks for animations to be removed. Short
+  /// enough not to read as an animation, long enough that the handover is a
+  /// fade rather than a flash.
+  static const Duration reducedEntrance = Duration(milliseconds: 300);
+
   static const Color _accent = Color(0xFF6366F1);
   static const Color _accentAlt = Color(0xFF0EA5E9);
 
@@ -86,18 +91,20 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // "Remove animations" in Android accessibility settings: show the composed
-    // end state for a beat and move on, rather than holding the user on a
-    // still frame for the full timeline.
+    // "Remove animations" in Android accessibility settings. The timeline is
+    // compressed rather than skipped: the same staged entrance runs, just too
+    // fast to read as motion, and the idle loop -- the only thing here that
+    // moves indefinitely -- is stopped outright.
+    //
+    // Deliberately not `_entrance.value = 1` plus a hand-rolled handover:
+    // assigning value reports no completed status, so that needed its own
+    // post-frame push and left two ways off this screen. Shortening the
+    // duration keeps exactly one, the status listener below.
     if (MediaQuery.disableAnimationsOf(context) && !_reducedMotion) {
       _reducedMotion = true;
-      _entrance.stop();
-      _entrance.value = 1;
       _idle.stop();
-      // Assigning value does not report a completed status, so the handover is
-      // scheduled here instead of coming through the status listener. One frame
-      // out, so the composed state is actually painted before the transition.
-      WidgetsBinding.instance.addPostFrameCallback((_) => _goNext());
+      _entrance.duration = SplashScreen.reducedEntrance;
+      _entrance.forward(from: 0);
     }
   }
 

@@ -87,16 +87,14 @@ void main() {
       (tester) async {
     await tester.pumpWidget(_wrap(disableAnimations: true));
 
-    // The composed end state is shown immediately rather than animating, and
-    // the screen still hands over instead of sitting on a still frame.
-    await tester.pump();
-    final logo =
-        tester.widget<FadeTransition>(find.byKey(SplashScreen.logoFadeKey));
-    expect(logo.opacity.value, equals(1));
-
+    // The assertion is about the outcome, not about which frame the handover
+    // lands on: the reduced timeline plus its page transition is well under a
+    // second, so by here the user is on the next screen rather than parked on
+    // a still frame for the full 2.1s entrance.
     await _frames(tester);
     expect(tester.takeException(), isNull);
     expect(find.byKey(_nextKey), findsOneWidget);
+    expect(SplashScreen.reducedEntrance, lessThan(SplashScreen.entrance));
   });
 
   testWidgets('disposes both tickers', (tester) async {
