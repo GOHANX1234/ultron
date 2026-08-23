@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:developer' as developer;
 import 'ai_service.dart';
 import 'screen_automation_service.dart';
@@ -50,64 +49,6 @@ class TaskExecutor {
     if (_cancelCompleter != null && !_cancelCompleter!.isCompleted) {
       _cancelCompleter!.complete();
     }
-  }
-
-  static const String _taskSystemPrompt = '''
-You are a phone automation agent. You are given a TASK and the current SCREEN content.
-You must decide what single action to take next to accomplish the task.
-
-Respond with ONLY a JSON object (no markdown, no code fences):
-{
-  "action": "action_name",
-  "params": {"key": "value"},
-  "reasoning": "why you chose this action",
-  "is_complete": false
-}
-
-Available actions:
-- click_text: {"text": "exact text to click"} - Click an element by its visible text
-- click_at: {"x": 540, "y": 960} - Click at screen coordinates (use bounds from screen dump)
-- type_text: {"text": "hello", "field_hint": "optional hint"} - Type into the focused/first edit field
-- press_enter: {} - Press the Enter/Search key on the keyboard to submit a search/form
-- scroll: {"direction": "down"} - Scroll down/up on the current view
-- swipe: {"startX": 540, "startY": 2000, "endX": 540, "endY": 500} - Swipe from start to end coordinates (e.g. open app drawer, navigate carousels)
-- press_back: {} - Press the back button
-- press_home: {} - Press the home button
-- open_app: {"app_name": "WhatsApp"} - Open an app
-- wait: {} - Wait a moment for content to load
-- done: {} - Task is complete
-
-Rules:
-- You will receive a TEXT DUMP of the accessibility tree containing exact text strings and center coordinates.
-- ALWAYS use the text dump to decide your next action.
-- If you need to click something, prefer using `click_text`. If the element does not have text, use `click_at` with the coordinates provided in the text dump.
-- When typing in a search box, you MUST click it first, wait a step, and THEN type.
-- After typing a search query, use `press_enter` once. If the screen does not change, click the exact visible suggestion text. Do not repeat the same submit action more than twice.
-- Never scroll or swipe more than three times in a row. After three scrolls, choose the best visible result or take a different action instead of continuing to browse indefinitely.
-- Set is_complete=true ONLY when the task is fully done.
-- If you need to find something by scrolling, scroll and then check the screen again.
-- If you need to open an app (like Wikipedia, Spotify, etc.) and you cannot find it after a couple of scrolls, ASSUME it is not installed. Immediately open Chrome or Google to search for the info on the web instead.
-- If stuck after 3 attempts, set is_complete=true and explain in reasoning.
-- Keep reasoning very brief (1 sentence)
-''';
-
-  /// Extract JSON safely even if wrapped in markdown or conversational text
-  String _extractJson(String text) {
-    // 1. Try to find a markdown json code block
-    final codeBlockRegex = RegExp(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```');
-    final match = codeBlockRegex.firstMatch(text);
-    if (match != null) {
-      return match.group(1)!;
-    }
-
-    // 2. Fallback: find the first { and the last }
-    final startIndex = text.indexOf('{');
-    final endIndex = text.lastIndexOf('}');
-    if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
-      return text.substring(startIndex, endIndex + 1);
-    }
-
-    return text.trim();
   }
 
   /// Execute a multi-step task with LLM guidance
@@ -259,25 +200,15 @@ Rules:
         name: 'Ultron-3',
       );
 
-      // Determine previous result string
-      final prevResultStr = step > 0 && results.isNotEmpty
-          ? '\nPREVIOUS ACTION RESULT: ${results.last}\n'
-          : '';
-
-      // Build failure hint if agent is stuck in a loop
-      String failureHint = '';
-      if (consecutiveFailures >= 3) {
-        failureHint =
-            '\n\nWARNING: You have failed $consecutiveFailures times in a row with the same approach. You MUST try a completely different action. If open_app failed, try press_home and look for the app icon on the home screen instead. If click_text failed, use click_at with coordinates. Do NOT repeat the same failed action.';
-      }
-
       // 2. Build the prompt (system prompt is sent separately via sendTaskMessage)
-      final prompt =
-          '''TASK: $userGoal
-
-CURRENT SCREEN TEXT DUMP:
-$screenContent$prevResultStr$failureHint
-Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. What is the next action?''';
+      final prompt = PromptBuilder.buildStepPrompt(
+        userGoal: userGoal,
+        screenContent: screenContent,
+        step: step,
+        maxSteps: _aiService.maxSteps,
+        results: results,
+        consecutiveFailures: consecutiveFailures,
+      );
 
       developer.log('=== AI PROMPT ===\n$prompt', name: 'Ultron-3');
 
@@ -285,7 +216,10 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
       String response;
       try {
         _cancelCompleter = Completer<void>();
-        final aiFuture = _aiService.sendTaskMessage(_taskSystemPrompt, prompt);
+        final aiFuture = _aiService.sendTaskMessage(
+          PromptBuilder.taskSystemPrompt,
+          prompt,
+        );
 
         // Race: whichever finishes first wins
         final result = await Future.any([
@@ -377,25 +311,19 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
       }
 
       // 4. Parse the action (with one retry on failure)
-      Map<String, dynamic>? actionJson;
-      String? parsedJsonStr;
-      try {
-        String jsonStr = _extractJson(response);
-
-        actionJson = jsonDecode(jsonStr) as Map<String, dynamic>;
-        parsedJsonStr = jsonStr;
-      } catch (firstError) {
+      Map<String, dynamic>? actionJson = ActionParser.parseAction(response);
+      if (actionJson == null) {
         // First attempt failed — retry once
         developer.log(
-          '=== JSON PARSE FAILED, RETRYING ===\nError: $firstError\nRaw: $response',
+          '=== JSON PARSE FAILED, RETRYING ===\nRaw: $response',
           name: 'Ultron-3',
         );
-        _report('Retrying step ${step + 1}...\n(Failed to parse: $firstError)');
+        _report('Retrying step ${step + 1}...\n(Failed to parse AI response)');
         // Wait 2 seconds before retrying to prevent rate-limit spam
         await Future.delayed(const Duration(seconds: 2));
         try {
           final retryResponse = await _aiService.sendTaskMessage(
-            _taskSystemPrompt,
+            PromptBuilder.taskSystemPrompt,
             prompt,
           );
           totalTokens += retryResponse.totalTokens;
@@ -404,14 +332,18 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
             name: 'Ultron-3',
           );
 
-          String jsonStr = _extractJson(retryResponse.content);
-          actionJson = jsonDecode(jsonStr) as Map<String, dynamic>;
-          parsedJsonStr = jsonStr;
+          actionJson = ActionParser.parseAction(retryResponse.content);
+          if (actionJson == null) {
+            throw FormatException(
+              'AI response was not valid JSON',
+              retryResponse.content,
+            );
+          }
         } catch (e) {
           results.add('Step ${step + 1}: Error after retry: $e');
 
           String debugInfo = 'Error: $e';
-          _report('AI Error: $debugInfo\n\nRaw output:\n${response}');
+          _report('AI Error: $debugInfo\n\nRaw output:\n$response');
 
           await _notificationService.showTaskCompleteNotification(
             'Task Error',
@@ -430,10 +362,11 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
         }
       }
 
-      final action = actionJson['action'] as String? ?? 'done';
-      final params = actionJson['params'] as Map<String, dynamic>? ?? {};
-      final reasoning = actionJson['reasoning'] as String? ?? '';
-      final isComplete = actionJson['is_complete'] == true;
+      final fields = ActionParser.extractFields(actionJson);
+      final action = fields.action;
+      final params = fields.params;
+      final reasoning = fields.reasoning;
+      final isComplete = fields.isComplete;
 
       developer.log(
         '=== PARSED ACTION ===\nAction: $action\nParams: $params\nReasoning: $reasoning\nIs Complete: $isComplete',
