@@ -66,10 +66,16 @@ flutter_launcher_icons:
   # foreground source lives outside assets/ so it is not bundled into the APK.
   adaptive_icon_background: "#000000"
   adaptive_icon_foreground: "tool/icons/app-logo-foreground.png"
-  # NOTE: regenerating rewrites res/mipmap-anydpi-v26/ic_launcher*.xml and this
-  # version of the package does not emit a <monochrome> layer, so re-add the
-  # monochrome line (pointing at @mipmap/ic_launcher_monochrome, which is checked
-  # in) afterwards or themed icons on Android 13+ will fall back to the square.
+  # NOTE: this config is kept for reference only -- the generated output is all
+  # checked in, and CI deliberately does NOT run `dart run flutter_launcher_icons`.
+  # Regenerating by hand has two consequences to undo afterwards:
+  #  1. it writes res/values/colors.xml with an ic_launcher_background colour,
+  #     which collides with res/values/ic_launcher_background.xml and fails
+  #     :app:mergeReleaseResources with "Duplicate resources" -- delete one.
+  #  2. it rewrites res/mipmap-anydpi-v26/ic_launcher*.xml and this version does
+  #     not emit a <monochrome> layer, so re-add the monochrome line (pointing at
+  #     @mipmap/ic_launcher_monochrome, which is checked in) or themed icons on
+  #     Android 13+ fall back to the square.
 
 flutter:
   uses-material-design: true

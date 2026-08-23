@@ -30,8 +30,11 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
-      - name: Generate launcher icons
-        run: dart run flutter_launcher_icons
+      # No launcher-icon generation step: every density, the adaptive-icon XML
+      # and the <monochrome> layer are committed under android/.../res. Running
+      # flutter_launcher_icons here also emitted values/colors.xml, which
+      # collides with values/ic_launcher_background.xml, and rewrote the
+      # anydpi-v26 XML without the <monochrome> element.
 
       - name: Run tests
         run: flutter test
