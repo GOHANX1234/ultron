@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The native launch window's colour. Kept identical to SplashScreen's own
+         Scaffold background (lib/screens/splash_screen.dart) so the handover
+         from the Android launch window to Flutter's first frame is invisible
+         instead of flashing. -->
+    <color name="splash_background">#FFF8FAFC</color>
+</resources>

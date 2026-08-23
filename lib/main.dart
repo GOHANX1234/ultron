@@ -6,6 +6,7 @@ import 'dart:developer';
 import 'config/feature_flags.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/splash_screen.dart';
 import 'overlay_main.dart';
 
 @pragma("vm:entry-point")
@@ -185,9 +186,15 @@ class Ultron3App extends StatelessWidget {
               ),
             ),
           ),
-          home: onboardingCompleted
-              ? const HomeScreen()
-              : const OnboardingScreen(),
+          // The splash owns the first route and replaces itself when its
+          // animation finishes. `next` is a builder rather than a widget so
+          // HomeScreen/OnboardingScreen are not constructed — and do not start
+          // their initState work — until the entrance is over.
+          home: SplashScreen(
+            next: (_) => onboardingCompleted
+                ? const HomeScreen()
+                : const OnboardingScreen(),
+          ),
         ),
       );
     },
