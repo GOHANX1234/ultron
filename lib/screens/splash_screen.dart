@@ -30,6 +30,12 @@ class SplashScreen extends StatefulWidget {
   static const Key logoKey = Key('splash-logo');
   static const Key wordmarkKey = Key('splash-wordmark');
 
+  /// The two staged fades a test needs to read directly. Addressed by key
+  /// rather than by `find.ancestor(matching: FadeTransition)`, which also
+  /// matches the FadeTransitions inside the page transition wrapping the route.
+  static const Key logoFadeKey = Key('splash-logo-fade');
+  static const Key taglineFadeKey = Key('splash-tagline-fade');
+
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
@@ -144,9 +150,18 @@ class _SplashScreenState extends State<SplashScreen>
         children: [
           // The ambient glows are the app's own; fading them in on the halo's
           // timeline means the splash dissolves into the real background.
-          FadeTransition(
-            opacity: _haloIn,
-            child: const RepaintBoundary(child: BackgroundGlows()),
+          //
+          // BackgroundGlows is itself a Positioned.fill, so it has to be the
+          // direct child of a Stack -- hence the inner Stack rather than
+          // handing it straight to the FadeTransition, which would throw
+          // "Incorrect use of ParentDataWidget".
+          Positioned.fill(
+            child: FadeTransition(
+              opacity: _haloIn,
+              child: const RepaintBoundary(
+                child: Stack(children: [BackgroundGlows()]),
+              ),
+            ),
           ),
           Center(
             child: Column(
@@ -194,6 +209,7 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ),
           FadeTransition(
+            key: SplashScreen.logoFadeKey,
             opacity: _logoIn,
             child: ScaleTransition(
               // From 0.88 rather than 0: the mark arrives, it does not grow out
@@ -277,6 +293,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   Widget _buildTagline(bool isDark) {
     return FadeTransition(
+      key: SplashScreen.taglineFadeKey,
       opacity: _taglineIn,
       child: Text(
         'Automation agent',

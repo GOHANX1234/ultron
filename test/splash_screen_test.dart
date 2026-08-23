@@ -39,18 +39,10 @@ void main() {
     // A frame into the timeline the mark has started and the tagline has not:
     // if every element shared one interval this would read as a single pop.
     await tester.pump(const Duration(milliseconds: 250));
-    final logoEarly = tester.widget<FadeTransition>(
-      find.ancestor(
-        of: find.byKey(SplashScreen.logoKey),
-        matching: find.byType(FadeTransition),
-      ),
-    );
-    final taglineEarly = tester.widget<FadeTransition>(
-      find.ancestor(
-        of: find.text('Automation agent'),
-        matching: find.byType(FadeTransition),
-      ),
-    );
+    final logoEarly =
+        tester.widget<FadeTransition>(find.byKey(SplashScreen.logoFadeKey));
+    final taglineEarly =
+        tester.widget<FadeTransition>(find.byKey(SplashScreen.taglineFadeKey));
 
     expect(logoEarly.opacity.value, greaterThan(0));
     expect(taglineEarly.opacity.value, equals(0));
@@ -81,12 +73,8 @@ void main() {
     // The composed end state is shown immediately rather than animating, and
     // the screen still hands over instead of sitting on a still frame.
     await tester.pump();
-    final logo = tester.widget<FadeTransition>(
-      find.ancestor(
-        of: find.byKey(SplashScreen.logoKey),
-        matching: find.byType(FadeTransition),
-      ),
-    );
+    final logo =
+        tester.widget<FadeTransition>(find.byKey(SplashScreen.logoFadeKey));
     expect(logo.opacity.value, equals(1));
 
     await tester.pump(const Duration(milliseconds: 600));
