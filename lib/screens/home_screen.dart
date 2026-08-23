@@ -1218,69 +1218,67 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Radius of the mode dropdown's card.
+  static const double _modeMenuRadius = 18;
+
+  /// Inset between the card edge and a row's selection pill. The pill radius is
+  /// [_modeMenuRadius] minus this, so the two curves stay concentric.
+  static const double _modeMenuInset = 6;
+
   Widget _buildModeDropdownChip(bool isDark) {
     return PopupMenuButton<String>(
-      initialValue: _mode,
+      // Deliberately not passing initialValue: Flutter highlights the matching
+      // item by wrapping it in a bare Container(color: highlightColor), a
+      // full-bleed rectangle whose square corners overhang the rounded card.
+      // The selected row is styled inside its own child instead.
       onSelected: (String value) {
+        if (value == _mode) return;
         setState(() {
           _mode = value;
         });
       },
       position: PopupMenuPosition.under,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      offset: const Offset(0, 6),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(_modeMenuRadius),
+        side: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : Colors.black.withValues(alpha: 0.06),
+        ),
+      ),
+      // Clips the items' rectangular ink splashes to the rounded card.
+      clipBehavior: Clip.antiAlias,
       color: isDark ? const Color(0xFF1E293B) : Colors.white,
       elevation: 6,
+      // Matches the rows' horizontal inset so the padding around the pills is
+      // even on all four sides (the default is 8 vertical, 0 horizontal).
+      menuPadding: const EdgeInsets.symmetric(vertical: _modeMenuInset),
       itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-        PopupMenuItem<String>(
+        _buildModeMenuItem(
           value: 'chat',
-          child: Row(
-            children: [
-              Icon(
-                Icons.chat_bubble_outline_rounded,
-                size: 16,
-                color: _mode == 'chat' ? const Color(0xFF6366F1) : (isDark ? Colors.white70 : Colors.black87),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Chat Mode',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _mode == 'chat' ? const Color(0xFF6366F1) : (isDark ? Colors.white : Colors.black87),
-                ),
-              ),
-            ],
-          ),
+          label: 'Chat Mode',
+          icon: Icons.chat_bubble_outline_rounded,
+          isDark: isDark,
         ),
-        PopupMenuItem<String>(
+        _buildModeMenuItem(
           value: 'agent',
-          child: Row(
-            children: [
-              Icon(
-                Icons.smart_toy_outlined,
-                size: 16,
-                color: _mode == 'agent' ? const Color(0xFF6366F1) : (isDark ? Colors.white70 : Colors.black87),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Agent Mode',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _mode == 'agent' ? const Color(0xFF6366F1) : (isDark ? Colors.white : Colors.black87),
-                ),
-              ),
-            ],
-          ),
+          label: 'Agent Mode',
+          icon: Icons.smart_toy_outlined,
+          isDark: isDark,
         ),
       ],
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isDark ? Colors.white.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.05),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.10)
+              : Colors.black.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isDark ? Colors.white.withValues(alpha: 0.16) : Colors.black.withValues(alpha: 0.08),
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.16)
+                : Colors.black.withValues(alpha: 0.08),
             width: 1,
           ),
         ),
@@ -1288,7 +1286,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              _mode == 'chat' ? Icons.chat_bubble_outline_rounded : Icons.smart_toy_outlined,
+              _mode == 'chat'
+                  ? Icons.chat_bubble_outline_rounded
+                  : Icons.smart_toy_outlined,
               size: 14,
               color: isDark ? Colors.white70 : const Color(0xFF475569),
             ),
@@ -1306,6 +1306,72 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Icons.keyboard_arrow_down_rounded,
               size: 16,
               color: isDark ? Colors.white54 : const Color(0xFF64748B),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// One row of the mode dropdown. The selection state is drawn as an inset,
+  /// rounded pill inside the row so its curve stays concentric with the card,
+  /// rather than the square full-bleed highlight Flutter applies by default.
+  PopupMenuItem<String> _buildModeMenuItem({
+    required String value,
+    required String label,
+    required IconData icon,
+    required bool isDark,
+  }) {
+    final selected = _mode == value;
+    const accent = Color(0xFF6366F1);
+
+    return PopupMenuItem<String>(
+      value: value,
+      height: 44,
+      // The pill supplies the inset, so the item itself must not add padding.
+      padding: EdgeInsets.zero,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: _modeMenuInset),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? accent.withValues(alpha: 0.14) : Colors.transparent,
+          borderRadius: BorderRadius.circular(
+            _modeMenuRadius - _modeMenuInset,
+          ),
+          border: Border.all(
+            color: selected ? accent.withValues(alpha: 0.38) : Colors.transparent,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: selected
+                  ? accent
+                  : (isDark ? Colors.white70 : Colors.black87),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                color: selected
+                    ? accent
+                    : (isDark ? Colors.white : Colors.black87),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Reserved even when unselected so both rows measure the same width
+            // and the card does not resize between openings.
+            SizedBox(
+              width: 16,
+              child: selected
+                  ? const Icon(Icons.check_rounded, size: 16, color: accent)
+                  : null,
             ),
           ],
         ),
