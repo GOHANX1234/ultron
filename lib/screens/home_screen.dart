@@ -7,6 +7,7 @@ import '../models/chat_message.dart';
 import '../services/ai_service.dart';
 import '../services/action_handler.dart';
 import '../services/voice_service.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/floating_nav_bar.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/thinking_avatar.dart';
@@ -582,7 +583,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       extendBody: true,
       extendBodyBehindAppBar: true,
       backgroundColor: isDark ? const Color(0xFF090D16) : const Color(0xFFF8FAFC),
-      drawer: _buildDrawer(context, isDark),
+      // The drawer is its own widget so it keeps its session list in state
+      // instead of re-reading the history file on every streamed token, which
+      // is what the old inline FutureBuilder did.
+      drawer: AppDrawer(
+        isDark: isDark,
+        currentSessionId: _sessionId,
+        onNewChat: _startNewChat,
+        onOpenSession: _loadChatSession,
+        onSessionDeleted: _onSessionDeleted,
+        onOpenTaskHistory: _openTaskHistory,
+        onOpenSettings: _openSettings,
+      ),
       body: Stack(
         children: [
           // Dynamic liquid background glows
@@ -637,6 +649,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ],
       ),
     );
+  }
+
+  void _openTaskHistory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
+    );
+  }
+
+  /// The drawer has already removed the session from storage; this only fixes
+  /// up the screen when the deleted session is the one on display, which would
+  /// otherwise be re-saved under its old id on the next message.
+  void _onSessionDeleted(String id) {
+    if (id == _sessionId) _startNewChat();
   }
 
   Future<void> _openSettings() async {
@@ -1427,275 +1453,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDrawer(BuildContext context, bool isDark) {
-    final drawerBg = isDark ? const Color(0xFF090D16) : const Color(0xFFF8FAFC);
-
-    return Drawer(
-      backgroundColor: drawerBg,
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Drawer Header
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.asset(
-                      'assets/app-logo.png',
-                      width: 28,
-                      height: 28,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Ultron-3',
-                    style: TextStyle(
-                      color: isDark ? Colors.white : const Color(0xFF1E293B),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: Icon(
-                      Icons.close_rounded,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                      size: 20,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-
-            // New Chat Liquid Glass Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pop(context);
-                      _startNewChat();
-                    },
-                    borderRadius: BorderRadius.circular(16),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_comment_rounded, color: Colors.white, size: 16),
-                          SizedBox(width: 8),
-                          Text(
-                            'New Chat',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Divider(height: 1),
-            ),
-
-            // Section Label: CHAT HISTORY
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'CHAT HISTORY',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Theme.of(context).primaryColor,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-            ),
-
-            // Chat Sessions List
-            Expanded(
-              child: FutureBuilder<List<ChatSession>>(
-                future: ChatHistoryService.loadSessions(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'No recent chats',
-                        style: TextStyle(
-                          color: isDark ? Colors.grey[700] : Colors.grey[400],
-                          fontSize: 12,
-                        ),
-                      ),
-                    );
-                  }
-
-                  final sessions = snapshot.data!;
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    itemCount: sessions.length,
-                    itemBuilder: (context, index) {
-                      final session = sessions[index];
-                      final isCurrent = session.id == _sessionId;
-
-                      return Container(
-                        margin: const EdgeInsets.symmetric(vertical: 2),
-                        decoration: BoxDecoration(
-                          color: isCurrent
-                              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(14),
-                          border: isCurrent
-                              ? Border.all(
-                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
-                                )
-                              : null,
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                          dense: true,
-                          leading: Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            size: 16,
-                            color: isCurrent
-                                ? Theme.of(context).colorScheme.primary
-                                : (isDark ? Colors.grey[500] : Colors.grey[600]),
-                          ),
-                          title: Text(
-                            session.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                              color: isCurrent
-                                  ? (isDark ? Colors.white : const Color(0xFF1E293B))
-                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
-                            ),
-                          ),
-                          trailing: IconButton(
-                            icon: Icon(
-                              Icons.delete_outline_rounded,
-                              size: 16,
-                              color: Colors.redAccent.withValues(alpha: 0.7),
-                            ),
-                            onPressed: () async {
-                              await ChatHistoryService.deleteSession(session.id);
-                              if (isCurrent) {
-                                _startNewChat();
-                              }
-                              if (mounted) setState(() {});
-                            },
-                          ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _loadChatSession(session);
-                          },
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Divider(height: 1),
-            ),
-
-            // Navigation Options
-            ListTile(
-              horizontalTitleGap: 8,
-              leading: Icon(
-                Icons.history_rounded,
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
-                size: 20,
-              ),
-              title: Text(
-                'Task History',
-                style: TextStyle(
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.5,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
-                );
-              },
-            ),
-            ListTile(
-              horizontalTitleGap: 8,
-              leading: Icon(
-                Icons.settings_rounded,
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
-                size: 20,
-              ),
-              title: Text(
-                'Settings',
-                style: TextStyle(
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.5,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => SettingsScreen(
-                      aiService: _aiService,
-                      shizukuService: _actionHandler.shizuku,
-                      screenAutomationService: _actionHandler.screenAutomation,
-                      telegramService: _telegramService,
-                      voiceService: _voiceService,
-                    ),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-          ],
         ),
       ),
     );
