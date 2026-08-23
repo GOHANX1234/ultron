@@ -39,6 +39,11 @@ class FloatingNavBar extends StatelessWidget {
 
   static const Color _accent = Color(0xFF6366F1);
 
+  /// Identifies the logo-plus-wordmark row. Tests assert on the centring of the
+  /// whole row: the wordmark alone sits right of the logo, so its own centre is
+  /// not the brand's centre.
+  static const Key brandKey = Key('floating-nav-brand');
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -94,7 +99,7 @@ class FloatingNavBar extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    const _NavBrand(),
+                    const _NavBrand(key: FloatingNavBar.brandKey),
                     Row(
                       children: [
                         _NavAction(
@@ -146,7 +151,7 @@ class FloatingNavBar extends StatelessWidget {
 
 /// Logo plus wordmark. Const so it is created once and never rebuilt.
 class _NavBrand extends StatelessWidget {
-  const _NavBrand();
+  const _NavBrand({super.key});
 
   @override
   Widget build(BuildContext context) {
