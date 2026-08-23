@@ -27,27 +27,28 @@ Widget _wrap({bool busy = false, VoidCallback? onNewChat}) {
 }
 
 void main() {
-  testWidgets('brand stays optically centred despite uneven actions',
+  testWidgets('brand is centred in the gap between the action clusters',
       (tester) async {
     await tester.pumpWidget(_wrap());
 
-    // Measured against the bar's own card, not the viewport: that is the actual
-    // invariant, and it does not assume anything about the test surface size or
-    // the card's margins. It measures the whole brand row rather than the
-    // wordmark, whose centre sits ~19px right of the row's because of the logo.
-    final card = tester.getRect(find.byType(BackdropFilter));
+    // The bar has one action on the left and two on the right, so a
+    // card-centred brand reads as pushed right. The invariant is that the
+    // brand is centred in the free space *between* the clusters: equal gaps to
+    // the menu button on its left and the new-chat button on its right.
     final brand = tester.getRect(find.byKey(FloatingNavBar.brandKey));
+    final menu = tester.getRect(find.byIcon(Icons.menu_rounded));
+    final newChat = tester.getRect(find.byIcon(Icons.add_comment_outlined));
 
-    // One action on the left, two on the right: a Row of Spacers would push the
-    // brand left of centre, which is the layout bug this widget exists to fix.
-    expect(brand.center.dx, closeTo(card.center.dx, 1.0));
+    expect(brand.center.dx, closeTo((menu.right + newChat.left) / 2, 1.0));
 
-    // ...and it must genuinely sit between the two action clusters, not merely
-    // measure centred while overlapping them.
-    expect(brand.left,
-        greaterThan(tester.getRect(find.byIcon(Icons.menu_rounded)).right));
-    expect(brand.right,
-        lessThan(tester.getRect(find.byIcon(Icons.add_comment_outlined)).left));
+    // ...and it must genuinely sit between them, not merely measure centred
+    // while overlapping.
+    expect(brand.left, greaterThan(menu.right));
+    expect(brand.right, lessThan(newChat.left));
+
+    // The shift is leftward of the card's own centre, which is the point of it.
+    final card = tester.getRect(find.byType(BackdropFilter));
+    expect(brand.center.dx, lessThan(card.center.dx));
   });
 
   testWidgets('renders without raising', (tester) async {

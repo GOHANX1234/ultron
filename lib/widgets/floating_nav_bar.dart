@@ -99,7 +99,19 @@ class FloatingNavBar extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    const _NavBrand(key: FloatingNavBar.brandKey),
+                    // Centred in the space *between* the action clusters, not
+                    // in the card: one action sits on the left and two on the
+                    // right, so a card-centred brand reads as pushed right —
+                    // the eye centres it against the visible gaps, not the
+                    // card's midpoint. The insets are the cluster widths, so
+                    // this stays correct if either side gains an action.
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        left: _action,
+                        right: _action * 2 + _inset,
+                      ),
+                      child: const _NavBrand(key: FloatingNavBar.brandKey),
+                    ),
                     Row(
                       children: [
                         _NavAction(

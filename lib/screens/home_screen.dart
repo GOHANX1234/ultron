@@ -71,14 +71,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _initServices() async {
-    await _aiService.init();
-    await _notificationService.requestPermission();
-    await _voiceService.init();
-    await _telegramService.init();
-    await _actionHandler.shizuku.checkAvailability();
+    // The API-key banner is driven by _aiService.isConfigured, which is only
+    // true once init() has read SharedPreferences — so this runs first and
+    // paints immediately. Previously every service was initialised in one
+    // unguarded chain with a single setState at the end, so if any later step
+    // threw (a denied notification permission, no Shizuku, a bad Telegram
+    // token) the rebuild never happened and a configured app kept showing
+    // "API not configured" until something else called setState.
+    try {
+      await _aiService.init();
+    } catch (e) {
+      developer.log('AI service init failed: $e');
+    }
+    if (mounted) setState(() {});
 
-    if (mounted) {
-      setState(() {});
+    // Each of the remaining steps is independent; one failing must not stop
+    // the others or leave the UI stale.
+    await _guarded('notifications', () => _notificationService.requestPermission());
+    await _guarded('voice', () => _voiceService.init());
+    await _guarded('telegram', () => _telegramService.init());
+    await _guarded('shizuku', () => _actionHandler.shizuku.checkAvailability());
+
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _guarded(String label, Future<void> Function() step) async {
+    try {
+      await step();
+    } catch (e) {
+      developer.log('$label init failed: $e');
     }
   }
 
@@ -874,6 +895,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Height of one suggestion tile: its padding, the icon chip, a breathing gap
+  /// and two lines of title at the device's own text scale. Keep in step with
+  /// the tile's own paddings and text style below.
+  static double _suggestionTileHeight(BuildContext context) {
+    const verticalPadding = 14.0 * 2;
+    const iconChip = 8.0 * 2 + 18.0;
+    const gap = 10.0;
+    const lineHeight = 13.0 * 1.3;
+    return verticalPadding +
+        iconChip +
+        gap +
+        MediaQuery.textScalerOf(context).scale(lineHeight) * 2;
+  }
+
   Widget _buildApiWarningBanner(BuildContext context, bool isDark) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -999,14 +1034,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const SizedBox(height: 14),
 
           // 2-Column Grid Layout of Glass Suggestion Cards
+          //
+          // mainAxisExtent rather than childAspectRatio: the tile's contents
+          // are a fixed-size icon plus up to two lines of text, so its natural
+          // height depends on the device font scale. A ratio-derived height is
+          // computed from the width alone, which clipped the bottom of the
+          // second line as soon as the user's text size was above the default.
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 1.5,
+              mainAxisExtent: _suggestionTileHeight(context),
             ),
             itemCount: suggestions.length,
             itemBuilder: (context, index) {
