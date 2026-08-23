@@ -11,8 +11,12 @@ class NotificationService {
   Future<void> init() async {
     if (_initialized) return;
 
+    // Android renders the status-bar icon as a flat silhouette from the alpha
+    // channel alone, so the full-colour launcher icon would show up there as a
+    // solid white blob. ic_notification is an alpha-only version of the same
+    // artwork, padded to leave the margin the status bar expects.
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@drawable/ic_notification');
 
     const InitializationSettings initializationSettings =
         InitializationSettings(android: initializationSettingsAndroid);
