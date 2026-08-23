@@ -1,115 +1,131 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_overlay_window/flutter_overlay_window.dart';
-import 'dart:ui';
-import 'dart:math' as math;
+import 'package:url_launcher/url_launcher.dart';
+
+import '../config/design_tokens.dart';
 import '../config/feature_flags.dart';
 import '../services/ai_service.dart';
 import '../services/screen_automation_service.dart';
 import '../services/voice_service.dart';
+import '../widgets/app_buttons.dart';
+import '../widgets/onboarding/credential_field.dart';
+import '../widgets/onboarding/onboarding_stepper.dart';
+import '../widgets/onboarding/permission_item.dart';
+import '../widgets/ultron_mark.dart';
 import 'home_screen.dart';
 
-/// Custom painter for the Gemini-style multi-faceted sparkle icon
-class GeminiSparkleIconPainter extends CustomPainter {
-  final double animationValue;
-  final bool isDark;
+/// One row of the provider table.
+///
+/// The old screen scattered these defaults through an if-else chain inside
+/// `_selectProvider`, which is why the chip list and the defaults it applied
+/// could drift apart. Here the chips are built from the same table that fills
+/// the form.
+class ProviderOption {
+  const ProviderOption({
+    required this.id,
+    required this.name,
+    required this.baseUrl,
+    required this.model,
+    required this.host,
+    required this.needsKey,
+    this.keysUrl,
+  });
 
-  GeminiSparkleIconPainter({required this.animationValue, required this.isDark});
+  final String id;
+  final String name;
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width * 0.38;
+  /// Applied to the form on selection. Empty for `custom`, which clears the
+  /// form so the user is not editing someone else's endpoint.
+  final String baseUrl;
+  final String model;
 
-    // Draw the four-pointed star (Gemini-style sparkle)
-    final starPaint = Paint()
-      ..shader = LinearGradient(
-        colors: [
-          const Color(0xFF8B5CF6),
-          const Color(0xFF06B6D4),
-          const Color(0xFF3B82F6),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
+  /// The one-line mono hint under the name in the selector.
+  final String host;
 
-    // Main four-pointed star
-    final path = Path();
-    final innerRadius = radius * 0.28;
-    for (int i = 0; i < 4; i++) {
-      final angle = (i * math.pi / 2) - math.pi / 2 + (animationValue * 0.15);
-      final outerX = center.dx + radius * math.cos(angle);
-      final outerY = center.dy + radius * math.sin(angle);
-      final midAngle1 = angle - math.pi / 8;
-      final midAngle2 = angle + math.pi / 8;
-      final inner1X = center.dx + innerRadius * math.cos(midAngle1);
-      final inner1Y = center.dy + innerRadius * math.sin(midAngle1);
-      final inner2X = center.dx + innerRadius * math.cos(midAngle2);
-      final inner2Y = center.dy + innerRadius * math.sin(midAngle2);
+  /// Local servers take no credentials, so the key field is hidden for them
+  /// rather than shown and then ignored.
+  final bool needsKey;
 
-      if (i == 0) {
-        path.moveTo(inner1X, inner1Y);
-      } else {
-        path.lineTo(inner1X, inner1Y);
-      }
-      // Cubic bezier for smooth curves
-      path.quadraticBezierTo(outerX, outerY, inner2X, inner2Y);
-    }
-    path.close();
-    canvas.drawPath(path, starPaint);
+  /// Where this provider issues keys. Null where there is nothing to link to.
+  final String? keysUrl;
 
-    // Inner glow circle
-    final glowPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          Colors.white.withOpacity(0.5),
-          Colors.white.withOpacity(0.0),
-        ],
-      ).createShader(Rect.fromCircle(center: center, radius: innerRadius * 1.2));
-    canvas.drawCircle(center, innerRadius * 0.9, glowPaint);
+  static const List<ProviderOption> all = [
+    ProviderOption(
+      id: 'deepseek',
+      name: 'DeepSeek',
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-chat',
+      host: 'api.deepseek.com',
+      needsKey: true,
+      keysUrl: 'https://platform.deepseek.com/api_keys',
+    ),
+    ProviderOption(
+      id: 'groq',
+      name: 'Groq',
+      baseUrl: 'https://api.groq.com/openai/v1',
+      model: 'llama-3.3-70b-versatile',
+      host: 'api.groq.com',
+      needsKey: true,
+      keysUrl: 'https://console.groq.com/keys',
+    ),
+    ProviderOption(
+      id: 'nvidia',
+      name: 'NVIDIA NIM',
+      baseUrl: AiService.nvidiaBaseUrl,
+      model: AiService.nvidiaDefaultModel,
+      host: 'integrate.api.nvidia.com',
+      needsKey: true,
+      keysUrl: 'https://build.nvidia.com',
+    ),
+    ProviderOption(
+      id: 'ollama',
+      name: 'Ollama',
+      baseUrl: 'http://10.0.2.2:11434/v1',
+      model: 'gemma2',
+      host: 'on this network',
+      needsKey: false,
+      keysUrl: 'https://ollama.com/download',
+    ),
+    ProviderOption(
+      id: 'local',
+      name: 'Local server',
+      baseUrl: 'http://10.0.2.2:1234/v1',
+      model: 'qwen2.5-7b-instruct',
+      host: 'LM Studio, llama.cpp',
+      needsKey: false,
+    ),
+    ProviderOption(
+      id: 'custom',
+      name: 'Custom endpoint',
+      baseUrl: '',
+      model: '',
+      host: 'any OpenAI-compatible',
+      needsKey: true,
+    ),
+  ];
 
-    // Small satellite sparkles
-    final sparkleRadius = radius * 0.06;
-    final sparklePaint = Paint()..color = Colors.white.withOpacity(0.85);
-
-    final paint = Paint()
-      ..shader = LinearGradient(
-        colors: isDark
-            ? [const Color(0xFF818CF8), const Color(0xFF38BDF8), const Color(0xFFA78BFA)]
-            : [const Color(0xFF4F46E5), const Color(0xFF0EA5E9), const Color(0xFF7C3AED)],
-        transform: GradientRotation(animationValue * 2 * math.pi),
-      ).createShader(Rect.fromCircle(center: center, radius: radius))
-      ..style = PaintingStyle.fill;
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant GeminiSparkleIconPainter oldDelegate) =>
-      oldDelegate.animationValue != animationValue ||
-      oldDelegate.isDark != isDark;
+  static ProviderOption byId(String id) =>
+      all.firstWhere((p) => p.id == id, orElse: () => all.last);
 }
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
+
+  static const List<String> stepLabels = ['Overview', 'Permissions', 'Setup'];
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen>
-    with WidgetsBindingObserver, TickerProviderStateMixin {
+    with WidgetsBindingObserver {
   final PageController _pageController = PageController();
   final ScreenAutomationService _screenAutomationService =
       ScreenAutomationService();
   final AiService _aiService = AiService();
-
-  late AnimationController _liquidAnimationController;
-  late Animation<double> _liquidAnimation;
-  late AnimationController _heroIconController;
-  late Animation<double> _heroIconAnimation;
 
   int _currentStep = 0;
   bool _isAccessibilityGranted = false;
@@ -139,27 +155,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-
-    _liquidAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 16),
-    )..repeat(reverse: true);
-
-    _liquidAnimation = CurvedAnimation(
-      parent: _liquidAnimationController,
-      curve: Curves.easeInOutSine,
-    );
-
-    _heroIconController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 20),
-    )..repeat();
-
-    _heroIconAnimation = CurvedAnimation(
-      parent: _heroIconController,
-      curve: Curves.linear,
-    );
-
     _loadAiDefaults();
     _checkPermissions();
   }
@@ -189,8 +184,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _liquidAnimationController.dispose();
-    _heroIconController.dispose();
     _pageController.dispose();
     _apiKeyController.dispose();
     _baseUrlController.dispose();
@@ -236,110 +229,71 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _checkPermissions();
   }
 
+  /// Android will not let an app open the accessibility toggle directly on a
+  /// sideloaded build until "restricted settings" is allowed, so this is two
+  /// destinations rather than one button, in the order they have to be visited.
   Future<void> _requestAccessibility() async {
     if (!mounted) return;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: LiquidGlassContainer(
-          borderRadius: 24,
-          padding: const EdgeInsets.all(24),
+        backgroundColor: Brand.surface,
+        insetPadding: const EdgeInsets.all(Space.x3),
+        shape: const RoundedRectangleBorder(
+          borderRadius: Corner.sheetR,
+          side: BorderSide(color: Brand.line),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(Space.x3),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFF6366F1).withOpacity(0.25),
-                      const Color(0xFF0EA5E9).withOpacity(0.15),
-                    ],
-                  ),
-                ),
-                child: const Icon(
-                  Icons.accessibility_new_rounded,
-                  size: 32,
-                  color: Color(0xFF6366F1),
-                ),
+              const Text('TWO STEPS', style: AppType.eyebrow),
+              const SizedBox(height: Space.x1 + Space.half),
+              const Text(
+                'Turn on the accessibility service',
+                style: AppType.title,
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Enable Screen Automation',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                ),
+              const SizedBox(height: Space.x1 + Space.half),
+              const Text(
+                'Because this build was installed outside the Play Store, '
+                'Android hides the toggle until you allow it.',
+                style: AppType.body,
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Android Security Note:\nIf Android displays "Restricted setting", open App Info first, tap the top-right menu, select "Allow restricted settings", then enable Ultron 3 Screen Control.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.5,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                ),
+              const SizedBox(height: Space.x2),
+              const _DialogStep(
+                index: '01',
+                text: 'In App info, open the ⋮ menu and tap '
+                    '"Allow restricted settings".',
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: Space.x1 + Space.half),
+              const _DialogStep(
+                index: '02',
+                text: 'In Accessibility, find Ultron 3 under Installed apps '
+                    'and switch it on.',
+              ),
+              const SizedBox(height: Space.x3),
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
+                    child: SecondaryButton(
+                      label: 'App info',
                       onPressed: () {
                         Navigator.pop(dialogContext);
                         openAppSettings();
                       },
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        side: BorderSide(
-                          color: isDark
-                              ? Colors.white.withOpacity(0.2)
-                              : Colors.black.withOpacity(0.15),
-                        ),
-                      ),
-                      child: Text(
-                        '1. App Info',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white : const Color(0xFF1E293B),
-                        ),
-                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: Space.x1 + Space.half),
                   Expanded(
-                    child: ElevatedButton(
+                    child: PrimaryButton(
+                      label: 'Accessibility',
                       onPressed: () {
                         Navigator.pop(dialogContext);
                         _screenAutomationService.openAccessibilitySettings();
                       },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        backgroundColor: const Color(0xFF6366F1),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: const Text(
-                        '2. Settings',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
                     ),
                   ),
                 ],
@@ -358,35 +312,45 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       await FlutterOverlayWindow.requestPermission();
       granted = await FlutterOverlayWindow.isPermissionGranted();
     }
+    if (!mounted) return;
     setState(() {
       _isOverlayGranted = granted;
     });
   }
 
-  void _selectProvider(String provider) {
+  void _selectProvider(String id) {
+    final option = ProviderOption.byId(id);
     setState(() {
-      _selectedProvider = provider;
+      _selectedProvider = id;
       _validationError = null;
-      if (provider == 'deepseek') {
-        _baseUrlController.text = 'https://api.deepseek.com';
-        _modelController.text = 'deepseek-chat';
-      } else if (provider == 'groq') {
-        _baseUrlController.text = 'https://api.groq.com/openai/v1';
-        _modelController.text = 'llama-3.3-70b-versatile';
-      } else if (provider == 'nvidia') {
-        _baseUrlController.text = AiService.nvidiaBaseUrl;
-        _modelController.text = AiService.nvidiaDefaultModel;
-      } else if (provider == 'ollama') {
-        _baseUrlController.text = 'http://10.0.2.2:11434/v1';
-        _modelController.text = 'gemma2';
-      } else if (provider == 'local') {
-        _baseUrlController.text = 'http://10.0.2.2:1234/v1';
-        _modelController.text = 'qwen2.5-7b-instruct';
-      } else {
-        _baseUrlController.clear();
-        _modelController.clear();
-      }
+      _baseUrlController.text = option.baseUrl;
+      _modelController.text = option.model;
     });
+  }
+
+  Future<void> _openKeysPage(String url) async {
+    final uri = Uri.parse(url);
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      _notify('Could not open $url');
+    }
+  }
+
+  void _notify(String message, {bool good = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            if (good) ...[
+              const Icon(Icons.check_rounded, size: 18, color: Brand.signal),
+              const SizedBox(width: Space.x1 + Space.half),
+            ],
+            Expanded(child: Text(message, style: AppType.bodyStrong)),
+          ],
+        ),
+        margin: const EdgeInsets.all(Space.x2),
+      ),
+    );
   }
 
   Future<void> _testAndSave() async {
@@ -401,17 +365,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     if (baseUrl.isEmpty || model.isEmpty) {
       setState(() {
-        _validationError = 'Please specify the API Base URL and Model Name.';
+        _validationError = 'Enter both an endpoint and a model name.';
         _isValidating = false;
       });
       return;
     }
 
-    if (_selectedProvider != 'ollama' &&
-        _selectedProvider != 'local' &&
-        apiKey.isEmpty) {
+    if (ProviderOption.byId(_selectedProvider).needsKey && apiKey.isEmpty) {
       setState(() {
-        _validationError = 'API Key is required for cloud AI providers.';
+        _validationError =
+            'This provider needs an API key. Local servers do not.';
         _isValidating = false;
       });
       return;
@@ -419,9 +382,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     try {
       final models = await _aiService.fetchAvailableModels(baseUrl, apiKey);
+      // A local server that answers with an empty list is still a working
+      // endpoint, so absence of models is only fatal for cloud providers.
       if (models.isNotEmpty ||
-          _selectedProvider == 'ollama' ||
-          _selectedProvider == 'local') {
+          !ProviderOption.byId(_selectedProvider).needsKey) {
         await _aiService.saveSettings(
           apiKey: apiKey,
           baseUrl: baseUrl,
@@ -444,43 +408,25 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             _isValidating = false;
           });
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.check_circle_rounded, color: Colors.white),
-                  SizedBox(width: 12),
-                  Text(
-                    'Configuration Verified! Launching Ultron 3...',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-              backgroundColor: const Color(0xFF10B981),
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.all(16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          );
+          _notify('Endpoint reachable. Opening Ultron 3.', good: true);
 
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const HomeScreen()),
           );
         }
-      } else {
+      } else if (mounted) {
         setState(() {
           _validationError =
-              'Could not connect to AI endpoint. Please verify endpoint URL & key.';
+              'The endpoint answered, but listed no models. Check the URL '
+              'and key.';
           _isValidating = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _validationError =
-            'Connection Error: ${e.toString().replaceFirst('Exception: ', '')}';
+        _validationError = e.toString().replaceFirst('Exception: ', '');
         _isValidating = false;
       });
     }
@@ -491,16 +437,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     final apiKey = _apiKeyController.text.trim();
 
     if (baseUrl.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter an API Base URL first.'),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+      _notify('Enter an endpoint first.');
       return;
     }
 
@@ -510,164 +447,36 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     try {
       final models = await _aiService.fetchAvailableModels(baseUrl, apiKey);
+      if (!mounted) return;
 
       setState(() {
         _isValidating = false;
       });
 
       if (models.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('No models retrieved. Verify URL & Key.'),
-              backgroundColor: Colors.orangeAccent,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        }
+        _notify('No models came back. Check the endpoint and key.');
         return;
       }
 
-      if (mounted) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        showModalBottomSheet(
-          context: context,
-          backgroundColor: Colors.transparent,
-          isScrollControlled: true,
-          builder: (context) {
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.6,
-              padding: const EdgeInsets.only(top: 8),
-              child: LiquidGlassContainer(
-                borderRadius: 24,
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? Colors.white.withOpacity(0.2)
-                              : Colors.black.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.dns_rounded,
-                          color: Theme.of(context).primaryColor,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          AiService.isNvidiaBaseUrl(baseUrl)
-                              ? 'Select Free NVIDIA Model'
-                              : 'Select AI Model',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: ListView.separated(
-                        physics: const BouncingScrollPhysics(),
-                        itemCount: models.length,
-                        separatorBuilder: (_, __) => Divider(
-                          color: isDark
-                              ? Colors.white.withOpacity(0.08)
-                              : Colors.black.withOpacity(0.05),
-                          height: 1,
-                        ),
-                        itemBuilder: (context, index) {
-                          final modelName = models[index];
-                          final isCurrent =
-                              _modelController.text == modelName;
-
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 2,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            tileColor: isCurrent
-                                ? Theme.of(
-                                    context,
-                                  ).primaryColor.withOpacity(0.12)
-                                : Colors.transparent,
-                            title: Text(
-                              modelName,
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: isCurrent
-                                    ? FontWeight.bold
-                                    : FontWeight.w500,
-                                color: isCurrent
-                                    ? Theme.of(context).primaryColor
-                                    : (isDark
-                                          ? Colors.white70
-                                          : Colors.black87),
-                              ),
-                            ),
-                            trailing: isCurrent
-                                ? Icon(
-                                    Icons.check_circle_rounded,
-                                    color: Theme.of(context).primaryColor,
-                                    size: 18,
-                                  )
-                                : const Icon(
-                                    Icons.chevron_right_rounded,
-                                    size: 18,
-                                  ),
-                            onTap: () {
-                              setState(() {
-                                _modelController.text = modelName;
-                              });
-                              Navigator.pop(context);
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheetContext) => _ModelSheet(
+          models: models,
+          selected: _modelController.text,
+          nvidiaOnly: AiService.isNvidiaBaseUrl(baseUrl),
+          onPick: (name) {
+            setState(() => _modelController.text = name);
+            Navigator.pop(sheetContext);
           },
-        );
-      }
+        ),
+      );
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isValidating = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Error: ${e.toString().replaceFirst('Exception: ', '')}',
-            ),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
+      _notify(e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
@@ -693,1769 +502,984 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     return FeatureFlags.floatingOverlayEnabled ? 7 : 6;
   }
 
+  void _goToStep(int step) {
+    _pageController.animateToPage(
+      step,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final overlayStyle = SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-      statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
-      systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarDividerColor: Colors.transparent,
-      systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-      systemNavigationBarContrastEnforced: false,
-    );
-
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: overlayStyle,
-      child: Scaffold(
-        backgroundColor: isDark
-            ? const Color(0xFF090D16)
-            : const Color(0xFFF8FAFC),
-        body: Stack(
-          children: [
-            // Dynamic Soft Ambient Liquid Background
-            RepaintBoundary(
-              child: AnimatedBuilder(
-                animation: _liquidAnimation,
-                builder: (context, child) {
-                  final value = _liquidAnimation.value;
-                  return _buildLiquidBackgroundGlows(isDark, value);
-                },
-              ),
-            ),
-
-            // Master Backdrop Blur Layer for Glass Diffusion
-            Positioned.fill(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-                child: Container(color: Colors.transparent),
-              ),
-            ),
-
-            SafeArea(
-              child: Column(
-                children: [
-                  // Top Navigation & Step Indicator Header
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 6),
-                    child: _buildLiquidHeader(isDark),
+    // The flow carries its own theme rather than following the system one: this
+    // is the first screen of a fresh install, before the user has any settings,
+    // and it is the one surface where the brand has to land the same way on
+    // every device.
+    return Theme(
+      data: onboardingTheme(),
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: Brand.ink,
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
+        child: Scaffold(
+          backgroundColor: Brand.ink,
+          body: SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(),
+                const Divider(height: 1),
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    // Gated navigation: swiping past a step the user has not
+                    // satisfied is the one way to reach the setup form without
+                    // the accessibility service, which then fails silently on
+                    // the first task.
+                    physics: const NeverScrollableScrollPhysics(),
+                    onPageChanged: (index) =>
+                        setState(() => _currentStep = index),
+                    children: [
+                      _buildOverviewPage(),
+                      _buildPermissionsPage(),
+                      _buildSetupPage(),
+                    ],
                   ),
-
-                  Expanded(
-                    child: PageView(
-                      controller: _pageController,
-                      physics: const NeverScrollableScrollPhysics(),
-                      onPageChanged: (page) {
-                        setState(() {
-                          _currentStep = page;
-                        });
-                      },
-                      children: [
-                        _buildWelcomePage(isDark),
-                        _buildPermissionsPage(isDark),
-                        _buildModelSetupPage(isDark),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildLiquidBackgroundGlows(bool isDark, double animValue) {
-    final shiftX = math.sin(animValue * math.pi * 2) * 40;
-    final shiftY = math.cos(animValue * math.pi * 2) * 40;
-
-    return Positioned.fill(
-      child: Stack(
-        children: [
-          // Vibrant Azure/Blue Orb Top Right
-          Positioned(
-            top: -40 + shiftY,
-            right: -40 + shiftX,
-            child: Container(
-              width: 340,
-              height: 340,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    isDark
-                        ? const Color(0xFF0088CC).withOpacity(0.35)
-                        : const Color(0xFF38BDF8).withOpacity(0.32),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Electric Violet Orb Bottom Left
-          Positioned(
-            bottom: -60 - shiftY,
-            left: -60 - shiftX,
-            child: Container(
-              width: 360,
-              height: 360,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    isDark
-                        ? const Color(0xFF6366F1).withOpacity(0.30)
-                        : const Color(0xFF818CF8).withOpacity(0.28),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Soft Cyan Middle
-          Positioned(
-            top: 250 + shiftX,
-            left: -80 + shiftY,
-            child: Container(
-              width: 280,
-              height: 280,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    isDark
-                        ? const Color(0xFF0EA5E9).withOpacity(0.20)
-                        : const Color(0xFFC084FC).withOpacity(0.22),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Space.gutter,
+        Space.x2,
+        Space.gutter,
+        Space.x2,
       ),
-    );
-  }
-
-  Widget _buildLiquidHeader(bool isDark) {
-    return LiquidGlassContainer(
-      borderRadius: 24,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF8B5CF6), Color(0xFF06B6D4)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF8B5CF6).withOpacity(0.35),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.auto_awesome,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ULTRON 3',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.5,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                      Text(
-                        'Setup Guide',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: isDark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              // iOS Step Badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: isDark
-                      ? Colors.white.withOpacity(0.10)
-                      : Colors.white.withOpacity(0.85),
-                  border: Border.all(
-                    color: isDark
-                        ? Colors.white.withOpacity(0.18)
-                        : Colors.black.withOpacity(0.06),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFF10B981),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'STEP ${_currentStep + 1} OF 3',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.6,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
-                    ),
-                  ],
-                ),
+              const UltronWordmark(),
+              const Spacer(),
+              Text(
+                'STEP 0${_currentStep + 1} / 0${OnboardingScreen.stepLabels.length}',
+                style: AppType.dataSmall,
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          // iOS Telegram Liquid Segment Bar
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              color: isDark
-                  ? Colors.black.withOpacity(0.25)
-                  : Colors.black.withOpacity(0.04),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.black.withOpacity(0.04),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(child: _buildSegmentTab(0, 'Overview', Icons.auto_awesome_rounded, isDark)),
-                Expanded(child: _buildSegmentTab(1, 'Permissions', Icons.verified_user_rounded, isDark)),
-                Expanded(child: _buildSegmentTab(2, 'AI Setup', Icons.psychology_rounded, isDark)),
-              ],
-            ),
+          const SizedBox(height: Space.x2),
+          OnboardingStepper(
+            labels: OnboardingScreen.stepLabels,
+            current: _currentStep,
+            onSelect: _goToStep,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSegmentTab(int stepIndex, String title, IconData icon, bool isDark) {
-    final isActive = _currentStep == stepIndex;
-    final isDone = _currentStep > stepIndex;
+  // ---------------------------------------------------------------- overview
 
-    return GestureDetector(
-      onTap: () {
-        if (isDone || isActive || stepIndex <= _currentStep) {
-          _pageController.animateToPage(
-            stepIndex,
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeOutCubic,
-          );
-        }
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          gradient: isActive
-              ? const LinearGradient(
-                  colors: [Color(0xFF0088CC), Color(0xFF0066FF)],
-                )
-              : null,
-          boxShadow: isActive
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF0088CC).withOpacity(0.35),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isDone ? Icons.check_circle_rounded : icon,
-              size: 13,
-              color: isActive
-                  ? Colors.white
-                  : isDone
-                      ? const Color(0xFF10B981)
-                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-            ),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                  color: isActive
-                      ? Colors.white
-                      : isDone
-                          ? (isDark ? Colors.white70 : const Color(0xFF334155))
-                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // --- STEP 1: WELCOME & OVERVIEW ---
-  Widget _buildWelcomePage(bool isDark) {
+  /// Leads with the mechanism, not a tagline.
+  ///
+  /// The hierarchy is deliberate and uneven: one sentence of what the app does,
+  /// one panel explaining the loop that does it, two low-emphasis cards for the
+  /// things a sceptical user wants to know next, and a plain note handing over
+  /// to the permission screen. The four equal-weight feature cards this replaces
+  /// gave a first-time reader nothing to read first.
+  Widget _buildOverviewPage() {
     return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
-      child: Column(
-        children: [
-          const SizedBox(height: 14),
-
-          // --- Gemini-Style Sparkle Icon ---
-          Center(
-            child: RepaintBoundary(
-              child: SizedBox(
-                width: 160,
-                height: 160,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Soft ambient glow behind the icon
-                    AnimatedBuilder(
-                      animation: _liquidAnimation,
-                      builder: (context, child) {
-                        final pulse = 0.92 + _liquidAnimation.value * 0.08;
-                        return Transform.scale(
-                          scale: pulse,
-                          child: Container(
-                            width: 160,
-                            height: 160,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: [
-                                  const Color(0xFF8B5CF6).withOpacity(isDark ? 0.20 : 0.14),
-                                  const Color(0xFF06B6D4).withOpacity(isDark ? 0.08 : 0.05),
-                                  Colors.transparent,
-                                ],
-                                stops: const [0.0, 0.55, 1.0],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    // Gemini sparkle painted icon
-                    AnimatedBuilder(
-                      animation: _heroIconAnimation,
-                      builder: (context, child) {
-                        return CustomPaint(
-                          size: const Size(100, 100),
-                          painter: GeminiSparkleIconPainter(
-                            animationValue: _heroIconAnimation.value,
-                            isDark: isDark,
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // --- Headline with gradient accent ---
-          ShaderMask(
-            shaderCallback: (bounds) => LinearGradient(
-              colors: isDark
-                  ? [Colors.white, const Color(0xFFC7D2FE)]
-                  : [const Color(0xFF0F172A), const Color(0xFF334155)],
-            ).createShader(bounds),
-            child: const Text(
-              'Your Phone,\nYour Rules.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -1.2,
-                height: 1.15,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // --- Feature Cards ---
-          _buildFeatureRow(
-            isDark: isDark,
-            icon1: Icons.shield_rounded,
-            title1: 'On-Device Privacy',
-            desc1: 'Zero telemetry. Keys stored locally on your device.',
-            colors1: const [Color(0xFF10B981), Color(0xFF059669)],
-            icon2: Icons.touch_app_rounded,
-            title2: 'Screen Automation',
-            desc2: 'Taps, swipes & navigates apps autonomously.',
-            colors2: const [Color(0xFF38BDF8), Color(0xFF0284C7)],
-          ),
-          const SizedBox(height: 12),
-          _buildFeatureRow(
-            isDark: isDark,
-            icon1: Icons.hub_rounded,
-            title1: 'Multi-LLM Engine',
-            desc1: 'DeepSeek, Groq, NVIDIA, Ollama \u2014 your choice.',
-            colors1: const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
-            icon2: Icons.picture_in_picture_alt_rounded,
-            title2: 'Floating HUD',
-            desc2: 'Always-on overlay for real-time task status.',
-            colors2: const [Color(0xFFF59E0B), Color(0xFFD97706)],
-          ),
-          const SizedBox(height: 28),
-
-          // --- CTA Button ---
-          LiquidGlassButton(
-            onPressed: () {
-              _pageController.nextPage(
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeOutCubic,
-              );
-            },
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Get Started',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                SizedBox(width: 8),
-                Icon(Icons.arrow_forward_rounded, size: 18),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // --- Version badge ---
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: isDark
-                  ? Colors.white.withOpacity(0.06)
-                  : Colors.black.withOpacity(0.04),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.black.withOpacity(0.06),
-              ),
-            ),
-            child: Text(
-              'v1.0 \u2022 Built for Android',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.3,
-                color: isDark
-                    ? const Color(0xFF94A3B8)
-                    : const Color(0xFF64748B),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
+      padding: const EdgeInsets.fromLTRB(
+        Space.gutter,
+        Space.x3,
+        Space.gutter,
+        Space.x4,
       ),
-    );
-  }
-
-  Widget _buildFeatureRow({
-    required bool isDark,
-    required IconData icon1,
-    required String title1,
-    required String desc1,
-    required List<Color> colors1,
-    required IconData icon2,
-    required String title2,
-    required String desc2,
-    required List<Color> colors2,
-  }) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildCapabilityCard(
-            icon: icon1,
-            title: title1,
-            desc: desc1,
-            gradientColors: colors1,
-            isDark: isDark,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildCapabilityCard(
-            icon: icon2,
-            title: title2,
-            desc: desc2,
-            gradientColors: colors2,
-            isDark: isDark,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCapabilityCard({
-    required IconData icon,
-    required String title,
-    required String desc,
-    required List<Color> gradientColors,
-    required bool isDark,
-  }) {
-    return LiquidGlassContainer(
-      borderRadius: 18,
-      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(9),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: LinearGradient(
-                colors: [
-                  gradientColors[0].withOpacity(isDark ? 0.25 : 0.15),
-                  gradientColors[1].withOpacity(isDark ? 0.12 : 0.06),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              border: Border.all(
-                color: gradientColors[0].withOpacity(isDark ? 0.25 : 0.18),
-                width: 0.8,
-              ),
-            ),
-            child: Icon(icon, size: 18, color: gradientColors[0]),
+          const Text(
+            'Ultron runs your phone\nfrom one written instruction.',
+            style: AppType.display,
           ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.2,
-              color: isDark ? Colors.white : const Color(0xFF0F172A),
+          const SizedBox(height: Space.x2),
+          const Text(
+            'Type or dictate what you want done. Ultron reads what is on '
+            'screen, decides the next tap, and repeats until the job is '
+            'finished — in the apps already on this phone.',
+            style: AppType.body,
+          ),
+          const SizedBox(height: Space.x3),
+          const _Panel(
+            label: 'How a run works',
+            children: [
+              _NumberedStep(
+                index: '01',
+                title: 'It reads the screen',
+                body: 'Android\'s accessibility service exposes what is on '
+                    'screen as text: labels, buttons, and where each one sits.',
+              ),
+              _NumberedStep(
+                index: '02',
+                title: 'Your model picks one action',
+                body: 'That text and your goal go to the model you configure. '
+                    'It answers with a single step — tap, type, scroll, back.',
+              ),
+              _NumberedStep(
+                index: '03',
+                title: 'It acts, then looks again',
+                body: 'The step is dispatched, the screen is re-read, and the '
+                    'loop continues until the goal is met or it stops and says '
+                    'why.',
+              ),
+            ],
+          ),
+          const SizedBox(height: Space.x2),
+          // IntrinsicHeight, because stretch alone resolves against the
+          // scroll view's infinite height. The two bodies are different
+          // lengths, and a pair of cards whose bottom edges do not line up is
+          // the first thing that reads as unconsidered.
+          const IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _MiniCard(
+                    title: 'Your model, your key',
+                    body: 'DeepSeek, Groq, NVIDIA, or an Ollama or LM Studio '
+                        'server on your own machine.',
+                  ),
+                ),
+                SizedBox(width: Space.x2),
+                Expanded(
+                  child: _MiniCard(
+                    title: 'Nothing runs quietly',
+                    body: 'Every step is written to task history, and a run can '
+                        'be stopped mid-step.',
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            desc,
-            style: TextStyle(
-              fontSize: 11,
-              height: 1.45,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            ),
+          const SizedBox(height: Space.x3),
+          const _Note(
+            label: 'Next',
+            text: 'Two permissions do the actual work: the accessibility '
+                'service, and the microphone if you want to speak to it. The '
+                'next screen explains what each one reads, and what you lose '
+                'by declining it.',
+          ),
+          const SizedBox(height: Space.x3),
+          PrimaryButton(
+            label: 'Review permissions',
+            icon: Icons.arrow_forward_rounded,
+            onPressed: () => _goToStep(1),
           ),
         ],
       ),
     );
   }
 
-  // --- STEP 2: PERMISSIONS ---
-  Widget _buildPermissionsPage(bool isDark) {
-    final requiredCount = FeatureFlags.floatingOverlayEnabled ? 3 : 2;
-    final requiredGranted = [_isAccessibilityGranted, _isMicrophoneGranted, if (FeatureFlags.floatingOverlayEnabled) _isOverlayGranted].where((v) => v).length;
-    final optionalGranted = [_isNotificationsGranted, _isContactsGranted, _isPhoneGranted, _isSmsGranted].where((v) => v).length;
+  // ------------------------------------------------------------- permissions
 
+  Widget _buildPermissionsPage() {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          child: LiquidGlassContainer(
-            borderRadius: 18,
-            padding: const EdgeInsets.all(16),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              Space.gutter,
+              Space.x3,
+              Space.gutter,
+              Space.x3,
+            ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Text(
+                  'What Ultron needs\naccess to.',
+                  style: AppType.display,
+                ),
+                const SizedBox(height: Space.x2),
+                const Text(
+                  'Ultron cannot find its way around your phone by guessing. '
+                  'Each item below says what it reads, what it does with it, '
+                  'and what stops working if you decline.',
+                  style: AppType.body,
+                ),
+                const SizedBox(height: Space.x2),
+                Text(
+                  'GRANTED $_grantedCount / $_totalCount',
+                  style: AppType.dataSmall,
+                ),
+                const SizedBox(height: Space.x3),
+                _Panel(
+                  label: 'Required to run',
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF10B981).withOpacity(0.20),
-                            const Color(0xFF059669).withOpacity(0.08),
-                          ],
-                        ),
-                      ),
-                      child: Icon(
-                        _canProceedToModel ? Icons.verified_rounded : Icons.verified_user_rounded,
-                        color: const Color(0xFF10B981),
-                        size: 22,
-                      ),
+                    PermissionItem(
+                      name: 'Screen reading and tap control',
+                      why: 'Android exposes on-screen elements, and the ability '
+                          'to tap them, only through the accessibility '
+                          'service. This is the whole mechanism: Ultron reads '
+                          'the element tree as text and dispatches taps back '
+                          'through the same channel.',
+                      consequence: 'Without it, Ultron can still hold a '
+                          'conversation but cannot touch your phone. Every '
+                          'task will refuse to start.',
+                      granted: _isAccessibilityGranted,
+                      onGrant: _requestAccessibility,
+                      grantLabel: 'Set up',
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Permissions & Access',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '$_grantedCount of $_totalCount Active',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: isDark
-                                  ? const Color(0xFF94A3B8)
-                                  : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
+                    PermissionItem(
+                      name: 'Microphone',
+                      why: 'Speech is transcribed on device while you hold the '
+                          'mic button, and the microphone is released as soon '
+                          'as you let go. Nothing is recorded between commands.',
+                      consequence: 'Without it, you can still type every '
+                          'instruction. Voice input is the only thing you lose.',
+                      granted: _isMicrophoneGranted,
+                      onGrant: () => _requestPermission(Permission.microphone),
                     ),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        gradient: _canProceedToModel
-                            ? LinearGradient(
-                                colors: [
-                                  const Color(0xFF10B981).withOpacity(0.15),
-                                  const Color(0xFF059669).withOpacity(0.08),
-                                ],
-                              )
-                            : LinearGradient(
-                                colors: [
-                                  Colors.amber.withOpacity(0.15),
-                                  Colors.orange.withOpacity(0.08),
-                                ],
-                              ),
-                        border: Border.all(
-                          color: _canProceedToModel
-                              ? const Color(0xFF10B981).withOpacity(0.5)
-                              : Colors.amber.withOpacity(0.5),
-                        ),
+                    if (FeatureFlags.floatingOverlayEnabled)
+                      PermissionItem(
+                        name: 'Draw over other apps',
+                        why: 'Keeps a small control bubble on screen while a '
+                            'task runs in another app, so you can watch and '
+                            'stop it without switching back.',
+                        consequence: 'Without it, you have to reopen Ultron to '
+                            'see progress or cancel a run.',
+                        granted: _isOverlayGranted,
+                        onGrant: _requestOverlayPermission,
                       ),
-                      child: Text(
-                        _canProceedToModel ? 'READY' : 'ACTION NEEDED',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: _canProceedToModel
-                              ? const Color(0xFF10B981)
-                              : Colors.amber[800],
-                        ),
-                      ),
+                  ],
+                ),
+                const SizedBox(height: Space.x3),
+                _Panel(
+                  label: 'Optional — widens what it can do',
+                  children: [
+                    PermissionItem(
+                      name: 'Notifications',
+                      why: 'Posts one notification when a task finishes or '
+                          'fails, with the outcome in the text.',
+                      consequence: 'Without it, results are only visible '
+                          'inside the app.',
+                      granted: _isNotificationsGranted,
+                      onGrant: () =>
+                          _requestPermission(Permission.notification),
+                    ),
+                    PermissionItem(
+                      name: 'Contacts',
+                      why: 'Resolves a name in your instruction to a number, '
+                          'so "call Priya" works. Contacts are read on demand, '
+                          'never uploaded.',
+                      consequence: 'Without it, you will have to give full '
+                          'phone numbers.',
+                      granted: _isContactsGranted,
+                      onGrant: () => _requestPermission(Permission.contacts),
+                    ),
+                    PermissionItem(
+                      name: 'Phone',
+                      why: 'Places a call directly once you have asked for one.',
+                      consequence: 'Without it, Ultron opens the dialer with '
+                          'the number filled in and you press call.',
+                      granted: _isPhoneGranted,
+                      onGrant: () => _requestPermission(Permission.phone),
+                    ),
+                    PermissionItem(
+                      name: 'SMS',
+                      why: 'Sends a text message you have dictated or typed.',
+                      consequence: 'Without it, Ultron composes the message in '
+                          'your messaging app and leaves sending to you.',
+                      granted: _isSmsGranted,
+                      onGrant: () => _requestPermission(Permission.sms),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                // Progress bar
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 500),
-                    curve: Curves.easeOutCubic,
-                    height: 4,
-                    child: LinearProgressIndicator(
-                      value: _grantedCount / _totalCount,
-                      backgroundColor: isDark
-                          ? Colors.white.withOpacity(0.08)
-                          : Colors.black.withOpacity(0.05),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        _canProceedToModel
-                            ? const Color(0xFF10B981)
-                            : const Color(0xFF3B82F6),
-                      ),
-                      minHeight: 4,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
         ),
-
-        Expanded(
-          child: ListView(
-            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            children: [
-              _buildCategoryHeader('Core Permissions & Engine (Required)', isDark),
-              _buildPermissionGlassCard(
-                title: 'Screen Automation (Accessibility)',
-                subtitle:
-                    'Allows the agent to view screen elements and automate taps/scrolls.',
-                icon: Icons.accessibility_new_rounded,
-                isGranted: _isAccessibilityGranted,
-                isRequired: true,
-                onGrant: _requestAccessibility,
-                isDark: isDark,
-              ),
-              _buildPermissionGlassCard(
-                title: 'Microphone Access',
-                subtitle:
-                    'Captures voice commands for speech interaction.',
-                icon: Icons.mic_rounded,
-                isGranted: _isMicrophoneGranted,
-                isRequired: true,
-                onGrant: () => _requestPermission(Permission.microphone),
-                isDark: isDark,
-              ),
-              if (FeatureFlags.floatingOverlayEnabled)
-                _buildPermissionGlassCard(
-                  title: 'Floating Overlay Window',
-                  subtitle:
-                      'Displays the HUD bubble over other apps.',
-                  icon: Icons.layers_rounded,
-                  isGranted: _isOverlayGranted,
-                  isRequired: true,
-                  onGrant: _requestOverlayPermission,
-                  isDark: isDark,
-                ),
-
-              const SizedBox(height: 8),
-              _buildCategoryHeader('Optional Permissions', isDark),
-              _buildPermissionGlassCard(
-                title: 'System Notifications',
-                subtitle:
-                    'Displays status notifications and task summaries.',
-                icon: Icons.notifications_rounded,
-                isGranted: _isNotificationsGranted,
-                isRequired: false,
-                onGrant: () => _requestPermission(Permission.notification),
-                isDark: isDark,
-              ),
-              _buildPermissionGlassCard(
-                title: 'Contacts Access',
-                subtitle:
-                    'Used to find contacts when placing calls or sending messages.',
-                icon: Icons.contacts_rounded,
-                isGranted: _isContactsGranted,
-                isRequired: false,
-                onGrant: () => _requestPermission(Permission.contacts),
-                isDark: isDark,
-              ),
-              _buildPermissionGlassCard(
-                title: 'Phone Calls',
-                subtitle:
-                    'Allows initiating calls directly via voice command.',
-                icon: Icons.phone_rounded,
-                isGranted: _isPhoneGranted,
-                isRequired: false,
-                onGrant: () => _requestPermission(Permission.phone),
-                isDark: isDark,
-              ),
-              _buildPermissionGlassCard(
-                title: 'SMS Messaging',
-                subtitle:
-                    'Allows sending text messages on your request.',
-                icon: Icons.sms_rounded,
-                isGranted: _isSmsGranted,
-                isRequired: false,
-                onGrant: () => _requestPermission(Permission.sms),
-                isDark: isDark,
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-
-        // Navigation Bar
-        Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              TextButton.icon(
-                onPressed: () {
-                  _pageController.previousPage(
-                    duration: const Duration(milliseconds: 400),
-                    curve: Curves.easeOutCubic,
-                  );
-                },
-                icon: const Icon(Icons.arrow_back_rounded, size: 18),
-                label: const Text('Back'),
-                style: TextButton.styleFrom(
-                  foregroundColor: isDark ? Colors.white70 : const Color(0xFF475569),
-                ),
-              ),
-              const Spacer(),
-              Expanded(
-                flex: 2,
-                child: LiquidGlassButton(
-                  onPressed: _canProceedToModel
-                      ? () {
-                          _pageController.nextPage(
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeOutCubic,
-                          );
-                        }
-                      : null,
-                  disabled: !_canProceedToModel,
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Continue',
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Icon(Icons.arrow_forward_rounded, size: 18),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCategoryHeader(String title, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 10, top: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 3,
-            height: 14,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(2),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: title.contains('Required')
-                    ? [const Color(0xFF6366F1), const Color(0xFF3B82F6)]
-                    : [const Color(0xFF94A3B8), const Color(0xFF64748B)],
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPermissionGlassCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required bool isGranted,
-    required bool isRequired,
-    required VoidCallback onGrant,
-    required bool isDark,
-  }) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-      margin: const EdgeInsets.only(bottom: 10),
-      child: LiquidGlassContainer(
-        borderRadius: 18,
-        padding: const EdgeInsets.all(16),
-        borderColor: isGranted
-            ? const Color(0xFF10B981).withOpacity(0.35)
-            : (isRequired
-                ? const Color(0xFF6366F1).withOpacity(0.2)
-                : null),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        _Footer(
+          note: _canProceedToModel
+              ? null
+              : 'Continue unlocks once screen control and the microphone are on.',
           children: [
-            Row(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: LinearGradient(
-                      colors: isGranted
-                          ? [
-                              const Color(0xFF10B981).withOpacity(0.15),
-                              const Color(0xFF059669).withOpacity(0.06),
-                            ]
-                          : [
-                              const Color(0xFF6366F1).withOpacity(0.12),
-                              const Color(0xFF3B82F6).withOpacity(0.05),
-                            ],
-                    ),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 20,
-                    color: isGranted
-                        ? const Color(0xFF10B981)
-                        : const Color(0xFF6366F1),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          height: 1.35,
-                          color: isDark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (isRequired && !isGranted)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      color: const Color(0xFF6366F1).withOpacity(0.12),
-                      border: Border.all(
-                        color: const Color(0xFF6366F1).withOpacity(0.2),
-                      ),
-                    ),
-                    child: const Text(
-                      'REQUIRED',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                        color: Color(0xFF6366F1),
-                      ),
-                    ),
-                  ),
-              ],
+            SecondaryButton(
+              label: 'Back',
+              expand: false,
+              onPressed: () => _goToStep(0),
             ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: isGranted
-                    ? Container(
-                        key: const ValueKey('granted'),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xFF10B981).withOpacity(0.12),
-                              const Color(0xFF059669).withOpacity(0.06),
-                            ],
-                          ),
-                          border: Border.all(
-                            color: const Color(0xFF10B981).withOpacity(0.25),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.check_circle_rounded,
-                              size: 14,
-                              color: Color(0xFF10B981),
-                            ),
-                            SizedBox(width: 5),
-                            Text(
-                              'Granted',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF10B981),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ElevatedButton(
-                        key: const ValueKey('enable'),
-                        onPressed: onGrant,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6366F1),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 8,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Enable',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
+            const SizedBox(width: Space.x1 + Space.half),
+            Expanded(
+              child: PrimaryButton(
+                label: 'Continue',
+                icon: Icons.arrow_forward_rounded,
+                onPressed: _canProceedToModel ? () => _goToStep(2) : null,
               ),
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 
-  // --- STEP 3: MODEL SETUP ---
-  Widget _buildModelSetupPage(bool isDark) {
+  // ------------------------------------------------------------------- setup
+
+  Widget _buildSetupPage() {
+    final provider = ProviderOption.byId(_selectedProvider);
+
     return Column(
       children: [
         Expanded(
-          child: ListView(
-            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            children: [
-              // Header with icon
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFF8B5CF6).withOpacity(isDark ? 0.20 : 0.12),
-                          const Color(0xFF6366F1).withOpacity(isDark ? 0.08 : 0.05),
-                        ],
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.auto_awesome_rounded,
-                      size: 18,
-                      color: Color(0xFF8B5CF6),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Choose AI Provider',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Select a cloud AI or connect locally.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          color: isDark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Provider Chips Horizontal Scroll
-              SizedBox(
-                height: 76,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                    _buildProviderGlassChip(
-                      'deepseek',
-                      'DeepSeek',
-                      Icons.auto_awesome_rounded,
-                      isDark,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildProviderGlassChip(
-                      'groq',
-                      'Groq',
-                      Icons.bolt_rounded,
-                      isDark,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildProviderGlassChip(
-                      'nvidia',
-                      'NVIDIA AI',
-                      Icons.memory_rounded,
-                      isDark,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildProviderGlassChip(
-                      'ollama',
-                      'Ollama',
-                      Icons.computer_rounded,
-                      isDark,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildProviderGlassChip(
-                      'local',
-                      'Local Server',
-                      Icons.dns_rounded,
-                      isDark,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildProviderGlassChip(
-                      'custom',
-                      'Custom API',
-                      Icons.tune_rounded,
-                      isDark,
-                    ),
-                  ],
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              Space.gutter,
+              Space.x3,
+              Space.gutter,
+              Space.x3,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Connect a model.', style: AppType.display),
+                const SizedBox(height: Space.x2),
+                const Text(
+                  'Ultron works with any OpenAI-compatible endpoint: it posts '
+                  'the screen text and expects one JSON action back. Pick a '
+                  'provider to fill in its defaults, then paste your key.',
+                  style: AppType.body,
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              // Form Glass Container
-              LiquidGlassContainer(
-                borderRadius: 20,
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: Space.x3),
+                const Text('PROVIDER', style: AppType.eyebrow),
+                const SizedBox(height: Space.x1 + Space.half),
+                _buildProviderGrid(),
+                const SizedBox(height: Space.x3),
+                _Panel(
+                  label: 'Credentials',
+                  divided: false,
+                  padded: true,
                   children: [
-                    if (_selectedProvider != 'ollama' &&
-                        _selectedProvider != 'local') ...[
-                      _buildGlassTextField(
+                    if (provider.needsKey) ...[
+                      CredentialField(
+                        label: 'API key',
                         controller: _apiKeyController,
-                        label: 'API Key',
-                        hint: 'sk-xxxxxxxxxxxxxxxxxxxxxxxx',
                         obscure: _obscureKey,
-                        icon: Icons.key_rounded,
-                        isDark: isDark,
-                        suffix: IconButton(
-                          icon: Icon(
-                            _obscureKey
-                                ? Icons.visibility_off_rounded
-                                : Icons.visibility_rounded,
-                            color: isDark ? Colors.grey[400] : Colors.grey[600],
-                            size: 18,
-                          ),
-                          onPressed: () =>
-                              setState(() => _obscureKey = !_obscureKey),
+                        onToggleObscure: () =>
+                            setState(() => _obscureKey = !_obscureKey),
+                        hint: 'sk-...',
+                        helper: 'Stored in this app\'s private preferences on '
+                            'this device. It is sent only to the endpoint below.',
+                        hasError: _validationError != null,
+                        trailingLink: provider.keysUrl == null
+                            ? null
+                            : _LinkButton(
+                                label: 'GET A KEY',
+                                onTap: () => _openKeysPage(provider.keysUrl!),
+                              ),
+                      ),
+                      const SizedBox(height: Space.x2),
+                    ] else
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: Space.x2),
+                        child: _Note(
+                          label: 'No key needed',
+                          text: 'Local servers accept requests without '
+                              'credentials. Make sure the server is reachable '
+                              'from this phone — 10.0.2.2 only resolves on an '
+                              'emulator, so on a real device use the machine\'s '
+                              'LAN address.',
                         ),
                       ),
-                      const SizedBox(height: 14),
-                    ],
-                    _buildGlassTextField(
+                    CredentialField(
+                      label: 'Endpoint',
                       controller: _baseUrlController,
-                      label: 'API Base URL',
-                      hint: 'https://api.deepseek.com',
-                      icon: Icons.link_rounded,
-                      isDark: isDark,
+                      hint: 'https://api.example.com/v1',
+                      keyboardType: TextInputType.url,
+                      hasError: _validationError != null,
                     ),
-                    const SizedBox(height: 14),
-                    _buildGlassTextField(
+                    const SizedBox(height: Space.x2),
+                    CredentialField(
+                      label: 'Model',
                       controller: _modelController,
-                      label: 'Model Name',
-                      hint: 'deepseek-chat',
-                      icon: Icons.psychology_alt_rounded,
-                      isDark: isDark,
-                      suffix: IconButton(
-                        icon: _isValidating
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Color(0xFF6366F1),
-                                  ),
-                                ),
-                              )
-                            : const Icon(
-                                Icons.format_list_bulleted_rounded,
-                                color: Color(0xFF6366F1),
-                                size: 18,
-                              ),
-                        tooltip: 'Fetch Available Models',
-                        onPressed: _isValidating ? null : _fetchModels,
-                      ),
+                      hint: 'model-name',
+                      actionLabel: 'Fetch',
+                      onAction: _isValidating ? null : _fetchModels,
+                      helper: 'Fetch lists what this key can actually reach.',
                     ),
-                    if (_validationError != null) ...[
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent.withOpacity(0.10),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.redAccent.withOpacity(0.25),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.error_outline_rounded,
-                              color: Colors.redAccent,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _validationError!,
-                                style: const TextStyle(
-                                  color: Colors.redAccent,
-                                  fontSize: 12,
-                                  height: 1.3,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                    if (_isValidating || _validationError != null) ...[
+                      const SizedBox(height: Space.x2),
+                      _FormStatus(
+                        busy: _isValidating,
+                        error: _validationError,
                       ),
                     ],
                   ],
                 ),
-              ),
-              const SizedBox(height: 14),
-
-              // StepAudio TTS Configuration Container
-              LiquidGlassContainer(
-                borderRadius: 20,
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: Space.x2),
+                _Panel(
+                  label: 'Spoken replies',
+                  divided: false,
+                  padded: true,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
-                            gradient: LinearGradient(
-                              colors: [
-                                const Color(0xFF6366F1).withOpacity(isDark ? 0.20 : 0.12),
-                                const Color(0xFF38BDF8).withOpacity(isDark ? 0.08 : 0.05),
-                              ],
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.record_voice_over_rounded,
-                            size: 16,
-                            color: Color(0xFF6366F1),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Voice Output (StepAudio TTS)',
-                                style: TextStyle(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Endpoint: api.hcnsec.cn • Model: stepaudio-2.5-tts',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      'Replies can be read aloud through a cloud voice. Leave '
+                      'this blank to keep Ultron silent — you can add it later '
+                      'in Settings.',
+                      style: AppType.body,
                     ),
-                    const SizedBox(height: 14),
-                    _buildGlassTextField(
+                    const SizedBox(height: Space.x2),
+                    CredentialField(
+                      label: 'Voice API key',
                       controller: _ttsApiKeyController,
-                      label: 'TTS API Key (Optional)',
-                      hint: 'Enter your StepAudio API Key',
+                      optional: true,
                       obscure: _obscureTtsKey,
-                      icon: Icons.key_rounded,
-                      isDark: isDark,
-                      suffix: IconButton(
-                        icon: Icon(
-                          _obscureTtsKey
-                              ? Icons.visibility_off_rounded
-                              : Icons.visibility_rounded,
-                          color: isDark ? Colors.grey[400] : Colors.grey[600],
-                          size: 18,
-                        ),
-                        onPressed: () =>
-                            setState(() => _obscureTtsKey = !_obscureTtsKey),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Ultron-3 will speak conversational answers using the neural cixingnansheng voice.',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
+                      onToggleObscure: () =>
+                          setState(() => _obscureTtsKey = !_obscureTtsKey),
+                      hint: 'sk-...',
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 16),
-            ],
+              ],
+            ),
           ),
         ),
-
-        // Bottom Finish Button
-        Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              TextButton.icon(
-                onPressed: _isValidating
-                    ? null
-                    : () {
-                        _pageController.previousPage(
-                          duration: const Duration(milliseconds: 400),
-                          curve: Curves.easeOutCubic,
-                        );
-                      },
-                icon: const Icon(Icons.arrow_back_rounded, size: 18),
-                label: const Text('Back'),
-                style: TextButton.styleFrom(
-                  foregroundColor: isDark ? Colors.white70 : const Color(0xFF475569),
-                ),
+        _Footer(
+          children: [
+            SecondaryButton(
+              label: 'Back',
+              expand: false,
+              onPressed: _isValidating ? null : () => _goToStep(1),
+            ),
+            const SizedBox(width: Space.x1 + Space.half),
+            Expanded(
+              child: PrimaryButton(
+                label: 'Verify and finish',
+                busy: _isValidating,
+                onPressed: _testAndSave,
               ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Two columns of plain outlined cells.
+  ///
+  /// Not a scrolling strip of gradient-filled icon chips: a provider is a form
+  /// value, and a form value should look selectable rather than promotional. All
+  /// six are visible at once, which is also how you notice the local options
+  /// exist.
+  Widget _buildProviderGrid() {
+    final options = ProviderOption.all;
+    final rows = <Widget>[];
+
+    for (var i = 0; i < options.length; i += 2) {
+      if (i > 0) rows.add(const SizedBox(height: Space.x1 + Space.half));
+      rows.add(
+        // Not CrossAxisAlignment.stretch: this grid lives in a
+        // SingleChildScrollView, where stretch would resolve against an
+        // infinite height. Both cells are one line of name over one line of
+        // host, so they measure the same anyway.
+        Row(
+          children: [
+            Expanded(child: _providerCell(options[i])),
+            const SizedBox(width: Space.x1 + Space.half),
+            if (i + 1 < options.length)
+              Expanded(child: _providerCell(options[i + 1]))
+            else
               const Spacer(),
-              Expanded(
-                flex: 2,
-                child: LiquidGlassButton(
-                  onPressed: _isValidating ? null : _testAndSave,
-                  child: _isValidating
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Save & Launch',
-                              style: TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Icon(Icons.arrow_forward_rounded, size: 18),
-                          ],
-                        ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProviderGlassChip(
-    String id,
-    String label,
-    IconData icon,
-    bool isDark,
-  ) {
-    final isSelected = _selectedProvider == id;
-
-    return GestureDetector(
-      onTap: () => _selectProvider(id),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-        width: 98,
-        margin: const EdgeInsets.only(right: 4),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          gradient: isSelected
-              ? const LinearGradient(
-                  colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF8B5CF6).withOpacity(0.35),
-                    blurRadius: 16,
-                    spreadRadius: -2,
-                    offset: const Offset(0, 5),
-                  ),
-                ]
-              : null,
-        ),
-        child: LiquidGlassContainer(
-          borderRadius: 18,
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-          borderColor: isSelected
-              ? Colors.white.withOpacity(0.45)
-              : (isDark ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.8)),
-          gradient: isSelected
-              ? const LinearGradient(
-                  colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isSelected
-                      ? Colors.white.withOpacity(0.15)
-                      : Colors.transparent,
-                ),
-                child: Icon(
-                  icon,
-                  size: 20,
-                  color: isSelected
-                      ? Colors.white
-                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  color: isSelected
-                      ? Colors.white
-                      : (isDark ? Colors.white70 : const Color(0xFF334155)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGlassTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    bool obscure = false,
-    Widget? suffix,
-    required bool isDark,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 6),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.3,
-              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-            ),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: isDark
-                ? Colors.black.withOpacity(0.30)
-                : Colors.white.withOpacity(0.85),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withOpacity(0.14)
-                  : Colors.white,
-              width: 1.2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: isDark
-                    ? Colors.black.withOpacity(0.2)
-                    : const Color(0x0F0F172A),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: TextField(
-            controller: controller,
-            obscureText: obscure,
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : const Color(0xFF0F172A),
-            ),
-            decoration: InputDecoration(
-              prefixIcon: Icon(
-                icon,
-                size: 20,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF0088CC),
-              ),
-              hintText: hint,
-              hintStyle: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.normal,
-                color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-              border: InputBorder.none,
-              suffixIcon: suffix,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// Custom Liquid Glass Container Widget
-class LiquidGlassContainer extends StatelessWidget {
-  final Widget child;
-  final double borderRadius;
-  final EdgeInsetsGeometry padding;
-  final Color? borderColor;
-  final Gradient? gradient;
-
-  const LiquidGlassContainer({
-    super.key,
-    required this.child,
-    this.borderRadius = 22.0,
-    this.padding = const EdgeInsets.all(16.0),
-    this.borderColor,
-    this.gradient,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final defaultGradient = gradient ??
-        LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? [
-                  Colors.white.withOpacity(0.12),
-                  Colors.white.withOpacity(0.04),
-                ]
-              : [
-                  Colors.white.withOpacity(0.82),
-                  Colors.white.withOpacity(0.48),
-                ],
-        );
-
-    final borderGrad = borderColor != null
-        ? Border.all(color: borderColor!, width: 1.2)
-        : Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.18)
-                : Colors.white.withOpacity(0.75),
-            width: 1.2,
-          );
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          padding: padding,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(borderRadius),
-            gradient: defaultGradient,
-            border: borderGrad,
-            boxShadow: [
-              BoxShadow(
-                color: isDark
-                    ? Colors.black.withOpacity(0.35)
-                    : const Color(0x1A0F172A),
-                blurRadius: 20,
-                spreadRadius: -2,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
-// Liquid Glass Button Widget
-class LiquidGlassButton extends StatelessWidget {
-  final VoidCallback? onPressed;
-  final Widget child;
-  final bool disabled;
-
-  const LiquidGlassButton({
-    super.key,
-    required this.onPressed,
-    required this.child,
-    this.disabled = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    if (disabled || onPressed == null) {
-      return Container(
-        width: double.infinity,
-        height: 52,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          color: isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.08)
-                : Colors.black.withOpacity(0.06),
-          ),
-        ),
-        child: Center(
-          child: DefaultTextStyle(
-            style: TextStyle(
-              color: isDark ? Colors.white30 : const Color(0xFF94A3B8),
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-            child: child,
-          ),
+          ],
         ),
       );
     }
 
-    return Container(
-      width: double.infinity,
-      height: 52,
+    return Column(children: rows);
+  }
+
+  Widget _providerCell(ProviderOption option) {
+    return _ProviderCell(
+      option: option,
+      selected: option.id == _selectedProvider,
+      onTap: () => _selectProvider(option.id),
+    );
+  }
+}
+
+/// A titled surface: one hairline border, no shadow, no blur.
+///
+/// The label sits *outside* the box, so the box itself is only content. Groups
+/// of rows are separated by 1px rules rather than by being broken into separate
+/// floating cards, which is what makes a list of six permissions read as one
+/// list.
+class _Panel extends StatelessWidget {
+  const _Panel({
+    this.label,
+    required this.children,
+    this.divided = true,
+    this.padded = false,
+  });
+
+  final String? label;
+  final List<Widget> children;
+
+  /// Rules between children. Off for forms, where the fields carry their own
+  /// spacing.
+  final bool divided;
+
+  /// Pads the box. Off for rows that pad themselves edge to edge.
+  final bool padded;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      if (divided && i > 0) content.add(const Divider(height: 1));
+      content.add(children[i]);
+    }
+
+    final Widget box = Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0088CC), Color(0xFF0055FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.35),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0088CC).withOpacity(0.40),
-            blurRadius: 18,
-            spreadRadius: -2,
-            offset: const Offset(0, 6),
+        color: Brand.surface,
+        borderRadius: Corner.cardR,
+        border: Brand.hairline(),
+      ),
+      padding: padded ? const EdgeInsets.all(Space.x2) : EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: content,
+      ),
+    );
+
+    if (label == null) return box;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label!.toUpperCase(), style: AppType.eyebrow),
+        const SizedBox(height: Space.x1 + Space.half),
+        box,
+      ],
+    );
+  }
+}
+
+/// A step in the "how a run works" panel. The number is set in the data face and
+/// in the accent, which is the only ornament on the overview screen.
+class _NumberedStep extends StatelessWidget {
+  const _NumberedStep({
+    required this.index,
+    required this.title,
+    required this.body,
+  });
+
+  final String index;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(Space.x2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 26,
+            child: Text(
+              index,
+              style: AppType.dataSmall.copyWith(
+                color: Brand.signal,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppType.bodyStrong),
+                const SizedBox(height: Space.half),
+                Text(body, style: AppType.body),
+              ],
+            ),
           ),
         ],
       ),
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          foregroundColor: Colors.white,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+    );
+  }
+}
+
+/// The lower-emphasis pair on the overview screen: smaller type, same surface,
+/// no number and no accent — so they read as supporting detail next to the panel
+/// above them.
+class _MiniCard extends StatelessWidget {
+  const _MiniCard({required this.title, required this.body});
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(Space.x2),
+      decoration: BoxDecoration(
+        color: Brand.surface,
+        borderRadius: Corner.cardR,
+        border: Brand.hairline(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppType.label),
+          const SizedBox(height: Space.x1 - Space.half),
+          Text(body, style: AppType.caption),
+        ],
+      ),
+    );
+  }
+}
+
+/// An aside with no fill — a border and text. Used where something has to be
+/// said but does not deserve the weight of a panel.
+class _Note extends StatelessWidget {
+  const _Note({required this.label, required this.text});
+
+  final String label;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(Space.x2),
+      decoration: BoxDecoration(
+        borderRadius: Corner.cardR,
+        border: Brand.hairline(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label.toUpperCase(), style: AppType.eyebrow),
+          const SizedBox(height: Space.x1),
+          Text(text, style: AppType.body),
+        ],
+      ),
+    );
+  }
+}
+
+/// The pinned action row. Sits on a rule so it reads as chrome rather than as
+/// the end of the scrolling content, and carries one line of plain text when the
+/// primary action is unavailable — the reason, not a nag.
+class _Footer extends StatelessWidget {
+  const _Footer({required this.children, this.note});
+
+  final List<Widget> children;
+  final String? note;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Brand.line)),
+      ),
+      padding: const EdgeInsets.fromLTRB(
+        Space.gutter,
+        Space.x2,
+        Space.gutter,
+        Space.x2,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (note != null) ...[
+            Text(note!, style: AppType.caption),
+            const SizedBox(height: Space.x1 + Space.half),
+          ],
+          Row(children: children),
+        ],
+      ),
+    );
+  }
+}
+
+/// One provider in the selector: a square indicator, the name, and the host it
+/// will actually talk to. The host line is there because "Ollama" does not tell
+/// you the request is going to your own machine.
+class _ProviderCell extends StatelessWidget {
+  const _ProviderCell({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ProviderOption option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  static Key cellKey(String id) => Key('provider-$id');
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: cellKey(option.id),
+      color: selected ? Brand.surfaceHigh : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: Corner.controlR,
+        side: BorderSide(color: selected ? Brand.signal : Brand.line),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(Space.x1 + Space.half),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 9,
+                    height: 9,
+                    decoration: BoxDecoration(
+                      color: selected ? Brand.signal : Colors.transparent,
+                      borderRadius: Corner.markR,
+                      border: selected
+                          ? null
+                          : Border.all(color: Brand.lineStrong),
+                    ),
+                  ),
+                  const SizedBox(width: Space.x1),
+                  Expanded(
+                    child: Text(
+                      option.name,
+                      style: AppType.label.copyWith(
+                        color: selected
+                            ? Brand.textPrimary
+                            : Brand.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: Space.half + 2),
+              Text(
+                option.host,
+                style: AppType.dataSmall,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         ),
-        child: child,
+      ),
+    );
+  }
+}
+
+/// A text link in the accent, for documentation the user has to leave the app to
+/// read.
+class _LinkButton extends StatelessWidget {
+  const _LinkButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: Space.half),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: AppType.eyebrow.copyWith(color: Brand.signal)),
+            const SizedBox(width: Space.half),
+            const Icon(Icons.north_east_rounded, size: 12, color: Brand.signal),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The form's validation state, in one place under the fields.
+///
+/// The old screen only ever showed failure, and showed it as a red-tinted card
+/// with an icon. Progress is the state a user is actually waiting on, so it is
+/// reported first and in plain type.
+class _FormStatus extends StatelessWidget {
+  const _FormStatus({required this.busy, required this.error});
+
+  final bool busy;
+  final String? error;
+
+  static const Key busyKey = Key('form-status-busy');
+  static const Key errorKey = Key('form-status-error');
+
+  @override
+  Widget build(BuildContext context) {
+    if (busy) {
+      return const Row(
+        key: busyKey,
+        children: [
+          SizedBox(
+            width: 13,
+            height: 13,
+            child: CircularProgressIndicator(strokeWidth: 1.6),
+          ),
+          SizedBox(width: Space.x1 + Space.half),
+          Text('Checking the endpoint…', style: AppType.caption),
+        ],
+      );
+    }
+
+    if (error == null) return const SizedBox.shrink();
+
+    return Container(
+      key: errorKey,
+      padding: const EdgeInsets.all(Space.x1 + Space.half),
+      decoration: BoxDecoration(
+        color: Brand.danger.withValues(alpha: 0.08),
+        borderRadius: Corner.controlR,
+        border: Border.all(color: Brand.danger.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline_rounded, size: 16, color: Brand.danger),
+          const SizedBox(width: Space.x1 + Space.half),
+          Expanded(
+            child: Text(
+              error!,
+              style: AppType.body.copyWith(color: Brand.textPrimary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DialogStep extends StatelessWidget {
+  const _DialogStep({required this.index, required this.text});
+
+  final String index;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          index,
+          style: AppType.dataSmall.copyWith(
+            color: Brand.signal,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(width: Space.x1 + Space.half),
+        Expanded(child: Text(text, style: AppType.body)),
+      ],
+    );
+  }
+}
+
+/// The model picker. Model ids are data, so the list is set in mono and the
+/// current one is marked rather than recoloured.
+class _ModelSheet extends StatelessWidget {
+  const _ModelSheet({
+    required this.models,
+    required this.selected,
+    required this.nvidiaOnly,
+    required this.onPick,
+  });
+
+  final List<String> models;
+  final String selected;
+  final bool nvidiaOnly;
+  final ValueChanged<String> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.62,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(Space.x3, Space.x2, Space.x3, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: const BoxDecoration(
+                  color: Brand.lineStrong,
+                  borderRadius: Corner.markR,
+                ),
+              ),
+            ),
+            const SizedBox(height: Space.x3),
+            Text(
+              nvidiaOnly ? 'Free NVIDIA models' : 'Available models',
+              style: AppType.title,
+            ),
+            const SizedBox(height: Space.half),
+            Text('${models.length} REACHABLE WITH THIS KEY',
+                style: AppType.dataSmall),
+            const SizedBox(height: Space.x2),
+            Expanded(
+              child: ListView.separated(
+                itemCount: models.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final name = models[index];
+                  final isCurrent = name == selected;
+                  return InkWell(
+                    onTap: () => onPick(name),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: Space.x2),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              style: AppType.data.copyWith(
+                                color: isCurrent
+                                    ? Brand.textPrimary
+                                    : Brand.textSecondary,
+                              ),
+                            ),
+                          ),
+                          if (isCurrent)
+                            const Icon(
+                              Icons.check_rounded,
+                              size: 17,
+                              color: Brand.signal,
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
