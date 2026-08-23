@@ -41,10 +41,33 @@ void _unmockPlatform() {
 
 /// Settles the two futures started in initState without waiting on the page
 /// animation, which is not running yet.
+///
+/// The viewport is set to a phone rather than left at the 800x600 test default:
+/// these pages are written to a ~400dp column, and at 800dp wide the headline
+/// stops wrapping where it is meant to, which changes the very geometry the
+/// assertions below are about.
 Future<void> _boot(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(1080, 2340);
+  tester.view.devicePixelRatio = 2.7;
+  addTearDown(tester.view.reset);
+
   await tester.pumpWidget(const MaterialApp(home: OnboardingScreen()));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 50));
+}
+
+/// Scrolls a control into view, then taps it.
+///
+/// Every page here is a scroll view taller than the screen, so its footer
+/// action starts below the fold. A bare `tap()` on one only warns -- it still
+/// dispatches at an offset outside the view, where nothing receives it, so the
+/// step silently does not advance and the failure surfaces later as a missing
+/// widget on the next page.
+Future<void> _press(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -85,8 +108,10 @@ void main() {
       (tester) async {
     await _boot(tester);
 
-    await tester.tap(find.widgetWithText(PrimaryButton, 'Review permissions'));
-    await tester.pumpAndSettle();
+    await _press(
+      tester,
+      find.widgetWithText(PrimaryButton, 'Review permissions'),
+    );
 
     expect(find.text('What Ultron needs\naccess to.'), findsOneWidget);
     expect(find.text('STEP 02 / 03'), findsOneWidget);
@@ -95,8 +120,10 @@ void main() {
   testWidgets('Continue is gated until the two required permissions are on',
       (tester) async {
     await _boot(tester);
-    await tester.tap(find.widgetWithText(PrimaryButton, 'Review permissions'));
-    await tester.pumpAndSettle();
+    await _press(
+      tester,
+      find.widgetWithText(PrimaryButton, 'Review permissions'),
+    );
 
     final gate = tester.widget<PrimaryButton>(
       find.widgetWithText(PrimaryButton, 'Continue'),
@@ -115,8 +142,10 @@ void main() {
 
   testWidgets('the permission screen counts what is granted', (tester) async {
     await _boot(tester);
-    await tester.tap(find.widgetWithText(PrimaryButton, 'Review permissions'));
-    await tester.pumpAndSettle();
+    await _press(
+      tester,
+      find.widgetWithText(PrimaryButton, 'Review permissions'),
+    );
 
     expect(find.text('GRANTED 0 / 6'), findsOneWidget);
     expect(find.text('GRANTED'), findsNothing);
@@ -125,11 +154,12 @@ void main() {
   testWidgets('a step already visited is reachable from the stepper',
       (tester) async {
     await _boot(tester);
-    await tester.tap(find.widgetWithText(PrimaryButton, 'Review permissions'));
-    await tester.pumpAndSettle();
+    await _press(
+      tester,
+      find.widgetWithText(PrimaryButton, 'Review permissions'),
+    );
 
-    await tester.tap(find.byKey(OnboardingStepper.tileKey(0)));
-    await tester.pumpAndSettle();
+    await _press(tester, find.byKey(OnboardingStepper.tileKey(0)));
 
     expect(find.text('STEP 01 / 03'), findsOneWidget);
   });
