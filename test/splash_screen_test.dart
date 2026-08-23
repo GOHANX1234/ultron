@@ -18,6 +18,19 @@ Widget _wrap({bool disableAnimations = false}) {
   );
 }
 
+/// Pumps a fixed number of small frames.
+///
+/// Not pumpAndSettle: the splash keeps a looping controller running for as long
+/// as it is on screen, so settling never happens. Frame-by-frame also matters
+/// for route transitions — a controller started inside a frame gets its time
+/// baseline from its *first* tick, so a single large pump advances it by zero
+/// and the outgoing route is never removed.
+Future<void> _frames(WidgetTester tester, {int count = 24}) async {
+  for (var i = 0; i < count; i++) {
+    await tester.pump(const Duration(milliseconds: 40));
+  }
+}
+
 void main() {
   testWidgets('composes the mark, wordmark and tagline', (tester) async {
     await tester.pumpWidget(_wrap());
@@ -59,8 +72,12 @@ void main() {
     expect(find.byKey(_nextKey), findsNothing);
 
     await tester.pump(SplashScreen.entrance);
+    // Surfaced here rather than at the end of the test, so a throw from the
+    // handover is not reported as a missing widget.
+    expect(tester.takeException(), isNull);
+
     // The route transition still has to run.
-    await tester.pump(const Duration(milliseconds: 500));
+    await _frames(tester);
 
     expect(find.byKey(_nextKey), findsOneWidget);
     expect(find.byKey(SplashScreen.logoKey), findsNothing);
@@ -77,7 +94,8 @@ void main() {
         tester.widget<FadeTransition>(find.byKey(SplashScreen.logoFadeKey));
     expect(logo.opacity.value, equals(1));
 
-    await tester.pump(const Duration(milliseconds: 600));
+    await _frames(tester);
+    expect(tester.takeException(), isNull);
     expect(find.byKey(_nextKey), findsOneWidget);
   });
 
