@@ -23,7 +23,9 @@ class ChatMessage {
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
         role: json['role'] as String,
         content: json['content'] as String,
-        timestamp: DateTime.parse(json['timestamp'] as String),
+        // Normalise to the device's local zone: history written from a UTC
+        // timestamp parses back as UTC and would otherwise display as UTC.
+        timestamp: DateTime.parse(json['timestamp'] as String).toLocal(),
         actionResult: json['actionResult'] != null
             ? AgentActionResult.fromJson((json['actionResult'] as Map).cast<String, dynamic>())
             : null,

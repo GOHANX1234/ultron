@@ -84,7 +84,7 @@ class MessageBubble extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            _formatTime(message.timestamp),
+            _formatTime(context, message.timestamp),
             style: TextStyle(
               fontSize: 11,
               color: Colors.white.withValues(alpha: 0.7),
@@ -190,7 +190,7 @@ class MessageBubble extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                _formatTime(message.timestamp),
+                _formatTime(context, message.timestamp),
                 style: TextStyle(
                   fontSize: 11,
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
@@ -203,9 +203,18 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  String _formatTime(DateTime dt) {
-    final hour = dt.hour.toString().padLeft(2, '0');
-    final minute = dt.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
+  /// Renders the timestamp in the device's local time zone, using the device's
+  /// own 12h/24h preference and locale (via MaterialLocalizations) rather than a
+  /// hard-coded 24h format.
+  ///
+  /// [DateTime.toLocal] matters because history persisted from a UTC timestamp
+  /// parses back as UTC, which would otherwise be displayed as-is.
+  String _formatTime(BuildContext context, DateTime dt) {
+    final local = dt.toLocal();
+    final localizations = MaterialLocalizations.of(context);
+    return localizations.formatTimeOfDay(
+      TimeOfDay.fromDateTime(local),
+      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+    );
   }
 }

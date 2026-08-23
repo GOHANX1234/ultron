@@ -38,6 +38,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isLoading = false;
   bool _isListening = false;
 
+  /// Set when the user taps the send button while it is showing Stop; the
+  /// streaming loop checks it and breaks out.
+  bool _stopRequested = false;
+
   // Custom switch state: 'chat' or 'agent'
   String _mode = 'chat';
 
@@ -100,6 +104,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await ChatHistoryService.saveSession(session);
   }
 
+  /// Stop an in-flight response. Bound to the send button while it shows the
+  /// stop icon, replacing the old inline Stop button next to "Thinking...".
+  void _stopGeneration() {
+    _stopRequested = true;
+    _actionHandler.cancelTask();
+    _voiceService.cancelStreamingSession();
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+      _updateOverlayState();
+    }
+  }
+
   Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
 
@@ -107,18 +125,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() {
       _messages.add(userMessage);
       _isLoading = true;
+      _stopRequested = false;
     });
     _updateOverlayState();
     _textController.clear();
     _scrollToBottom();
     await _saveSession();
 
-    // Add empty placeholder assistant message for streaming
-    final assistantMessage = ChatMessage(role: 'assistant', content: '');
-    setState(() {
-      _messages.add(assistantMessage);
-    });
-    final assistantIndex = _messages.length - 1;
+    // The assistant bubble is created lazily, on the first chunk of visible
+    // text — inserting it up front showed an empty card while waiting. Null
+    // means "no bubble on screen yet"; the animated avatar stands in for it.
+    int? assistantIndex;
 
     await _voiceService.stopSpeaking();
 
@@ -147,30 +164,52 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       bool detectedAction = false;
 
       await for (final chunk in stream) {
+        if (_stopRequested) break;
         accumulated += chunk;
 
+        // A response that opens with JSON or a code fence is a device action,
+        // not something to show or speak.
+        final trimmed = accumulated.trimLeft();
+        final looksLikeAction =
+            trimmed.startsWith('{') || trimmed.startsWith('```');
+
         if (isTtsStreaming && !detectedAction) {
-          final trimmed = accumulated.trimLeft();
-          if (trimmed.startsWith('{') ||
-              trimmed.startsWith('```json') ||
-              trimmed.startsWith('```')) {
+          if (looksLikeAction) {
             detectedAction = true;
             _voiceService.cancelStreamingSession();
           } else {
             _voiceService.feedStreamChunk(chunk);
           }
+        } else if (looksLikeAction) {
+          detectedAction = true;
         }
 
-        if (mounted) {
+        if (mounted && !looksLikeAction && trimmed.isNotEmpty) {
           setState(() {
-            _messages[assistantIndex] = ChatMessage(
+            final bubble = ChatMessage(
               role: 'assistant',
               content: accumulated,
             );
+            if (assistantIndex == null) {
+              // First visible text: create the bubble now.
+              _messages.add(bubble);
+              assistantIndex = _messages.length - 1;
+            } else {
+              _messages[assistantIndex!] = bubble;
+            }
           });
           _scrollToBottom();
         }
       }
+
+      // Stopped by the user: keep whatever text already streamed, and do not
+      // run the action or speak the partial reply.
+      if (_stopRequested) {
+        _voiceService.cancelStreamingSession();
+        await _saveSession();
+        return;
+      }
+
       await _saveSession();
 
       // Check if it's an action
@@ -178,10 +217,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       if (action != null) {
         _voiceService.cancelStreamingSession();
-        // If it's an action, we remove the raw JSON message from display
-        setState(() {
-          _messages.removeAt(assistantIndex);
-        });
+        // Drop the bubble if one was created before the JSON became apparent.
+        if (assistantIndex != null) {
+          setState(() {
+            _messages.removeAt(assistantIndex!);
+          });
+          assistantIndex = null;
+        }
 
         await _showTaskProgressOverlay('Starting: ${text.trim()}');
 
@@ -239,10 +281,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
         await _saveSession();
       } else {
-        // Plain text response: finish streaming session to flush any remaining buffer
+        // Plain text response. If nothing was rendered — the text arrived as
+        // one chunk that first looked like JSON, or parsing failed — create the
+        // bubble now so the reply is never lost.
+        if (assistantIndex == null && accumulated.trim().isNotEmpty && mounted) {
+          setState(() {
+            _messages.add(
+              ChatMessage(role: 'assistant', content: accumulated),
+            );
+            assistantIndex = _messages.length - 1;
+          });
+          _scrollToBottom();
+          await _saveSession();
+        }
+
         if (isTtsStreaming && !detectedAction) {
           _voiceService.finishStreamingSession();
-        } else {
+        } else if (!detectedAction) {
+          // Never speak a raw JSON blob that failed to parse as an action.
           _voiceService.speak(accumulated);
         }
       }
@@ -250,8 +306,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _voiceService.cancelStreamingSession();
       if (mounted) {
         setState(() {
-          if (_messages.isNotEmpty && _messages.length > assistantIndex) {
-            _messages.removeAt(assistantIndex);
+          // Remove the partial bubble only if one exists and it is still empty
+          // of useful content; otherwise keep what streamed and append the error.
+          final idx = assistantIndex;
+          if (idx != null && idx < _messages.length &&
+              _messages[idx].content.trim().isEmpty) {
+            _messages.removeAt(idx);
           }
           _messages.add(
             ChatMessage(
@@ -560,7 +620,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
 
               // Shimmer / Dot pulse thinking loading indicator
-              if (_isLoading) _buildThinkingIndicator(isDark),
+              if (_isLoading) _buildThinkingIndicator(),
 
               // Frosted Liquid Glass Input Bar
               _buildInputBar(isDark),
@@ -1144,62 +1204,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildThinkingIndicator(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+  /// While a response is generating, the only indicator is the animated avatar.
+  /// The "Thinking..." label and inline Stop button were removed — the send
+  /// button doubles as Stop instead (see [_buildSendButton]).
+  Widget _buildThinkingIndicator() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Row(
         children: [
-          const ThinkingAvatar(size: 44),
-          const SizedBox(width: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.12)
-                    : Colors.black.withValues(alpha: 0.06),
-              ),
-            ),
-            child: Text(
-              'Thinking...',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          TextButton.icon(
-            onPressed: () {
-              _actionHandler.cancelTask();
-              setState(() {
-                _isLoading = false;
-              });
-            },
-            icon: const Icon(
-              Icons.stop_circle_rounded,
-              size: 16,
-              color: Colors.redAccent,
-            ),
-            label: const Text(
-              'Stop',
-              style: TextStyle(
-                color: Colors.redAccent,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
+          ThinkingAvatar(size: 44),
         ],
       ),
     );
@@ -1427,34 +1440,58 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ),
                           const SizedBox(width: 8),
 
-                          // Small ChatGPT Style Upward Arrow Send Button
+                          // ChatGPT-style button: upward arrow to send, and a
+                          // stop square while a response is generating.
                           Container(
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF6366F1).withValues(alpha: 0.40),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
+                              gradient: _isLoading
+                                  ? null
+                                  : const LinearGradient(
+                                      colors: [
+                                        Color(0xFF6366F1),
+                                        Color(0xFF0EA5E9),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                              color: _isLoading
+                                  ? (isDark
+                                        ? Colors.white.withValues(alpha: 0.14)
+                                        : Colors.black.withValues(alpha: 0.08))
+                                  : null,
+                              boxShadow: _isLoading
+                                  ? null
+                                  : [
+                                      BoxShadow(
+                                        color: const Color(
+                                          0xFF6366F1,
+                                        ).withValues(alpha: 0.40),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
                             ),
                             child: IconButton(
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
-                              icon: const Icon(
-                                Icons.arrow_upward_rounded,
-                                size: 19,
-                                color: Colors.white,
+                              tooltip: _isLoading ? 'Stop' : 'Send',
+                              icon: Icon(
+                                _isLoading
+                                    ? Icons.stop_rounded
+                                    : Icons.arrow_upward_rounded,
+                                size: _isLoading ? 18 : 19,
+                                color: _isLoading
+                                    ? (isDark
+                                          ? Colors.white
+                                          : const Color(0xFF1E293B))
+                                    : Colors.white,
                               ),
-                              onPressed: _isLoading ? null : () => _sendMessage(_textController.text),
+                              onPressed: _isLoading
+                                  ? _stopGeneration
+                                  : () => _sendMessage(_textController.text),
                             ),
                           ),
                         ],
